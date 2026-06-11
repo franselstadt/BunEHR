@@ -279,11 +279,11 @@ bun run db:studio          # open Drizzle Studio GUI
 
 ## Architecture Document
 
-Full 200-page architecture reference with DDD rationale, all files annotated, database schema, API reference, and security model:
+Full architecture reference — DDD rationale, all files annotated, database schema, API reference, and security model:
 
-```
-open docs/architecture.html
-```
+- **Markdown:** [docs/architecture.md](docs/architecture.md) (recommended)
+- **HTML:** [docs/architecture.html](docs/architecture.html) (print / browser)
+- **Index:** [docs/README.md](docs/README.md)
 
 ---
 

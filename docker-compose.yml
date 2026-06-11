@@ -1,10 +1,11 @@
 ##############################################################
-# Meblock EHR — Docker Compose
+# BunEHR — Docker Compose
 #
 # Services:
 #   postgres    PostgreSQL 16   → localhost:5433
 #   pgadmin     pgAdmin 4       → localhost:5050
-#   bun-ehr     Meblock EHR API → localhost:3000
+#   bun-ehr     BunEHR API      → localhost:3000
+#   frontend    React UI        → localhost:5173
 #
 # Start:     docker compose up -d
 # Rebuild:   docker compose up -d --build
@@ -56,12 +57,12 @@ services:
         condition: service_healthy
     networks: [ehr-net]
 
-  # ── Meblock EHR API ───────────────────────────────────────────────────────
+  # ── BunEHR API ─────────────────────────────────────────────────────────────
   bun-ehr:
     build:
       context: .
       dockerfile: Dockerfile
-    image: meblock-ehr:latest
+    image: bunehr-api:latest
     container_name: bunehr-api
     restart: unless-stopped
     environment:
@@ -84,12 +85,14 @@ services:
       start_period: 30s
     networks: [ehr-net]
 
-  # ── Meblock EHR Frontend ─────────────────────────────────────────────────
+  # ── BunEHR Frontend ────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: meblock-ehr-frontend:latest
+      args:
+        VITE_API_URL: ""
+    image: bunehr-frontend:latest
     container_name: bunehr-frontend
     restart: unless-stopped
     environment:
