@@ -27,7 +27,8 @@ export function buildApp(): Hono {
   app.use('*', async (c, next) => {
     await next()
     const ct = c.res.headers.get('content-type') ?? ''
-    if (ct.includes('application/json') && c.res.status !== 204) {
+    const shouldNormalizeJson = c.req.path.startsWith('/v1')
+    if (shouldNormalizeJson && ct.includes('application/json') && c.res.status !== 204) {
       try {
         const body = await c.res.json() as unknown
         c.res = c.newResponse(JSON.stringify(deepSnakeCase(body)), c.res.status as never, {

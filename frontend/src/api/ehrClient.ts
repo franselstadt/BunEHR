@@ -22,6 +22,60 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return res.json() as Promise<T>
 }
 
+type JsonRecord = Record<string, unknown>
+
+const getField = <T>(obj: JsonRecord, camel: string, snake: string, fallback: T): T => {
+  const value = (obj[camel] ?? obj[snake]) as T | undefined
+  return value ?? fallback
+}
+
+const normalizeStatus = (raw: unknown): Patient['status'] => {
+  const value = String(raw ?? 'ADMITTED').toUpperCase()
+  if (value === 'ACTIVE' || value === 'ADMITTED' || value === 'DISCHARGED' || value === 'CRITICAL' || value === 'STABLE' || value === 'OBSERVATION') {
+    return value
+  }
+  return 'ADMITTED'
+}
+
+const toPatient = (raw: unknown): Patient => {
+  const obj = (raw ?? {}) as JsonRecord
+  const vitalsRaw = (obj['vitals'] ?? obj['vital_signs']) as JsonRecord | undefined
+  const locationRaw = (obj['location'] ?? obj['geo']) as JsonRecord | undefined
+
+  return {
+    ehrId: getField(obj, 'ehrId', 'ehr_id', 'unknown-ehr'),
+    subjectId: getField(obj, 'subjectId', 'subject_id', 'unknown-subject'),
+    firstName: getField(obj, 'firstName', 'first_name', 'Unknown'),
+    lastName: getField(obj, 'lastName', 'last_name', 'Patient'),
+    dateOfBirth: getField(obj, 'dateOfBirth', 'date_of_birth', '1980-01-01'),
+    gender: (() => {
+      const gender = String(getField(obj, 'gender', 'gender', 'other')).toLowerCase()
+      return gender === 'male' || gender === 'female' ? gender : 'other'
+    })(),
+    bloodType: getField(obj, 'bloodType', 'blood_type', 'O+'),
+    ward: getField(obj, 'ward', 'ward', 'General Medicine'),
+    room: getField(obj, 'room', 'room', 'GM-100'),
+    admittedDate: getField(obj, 'admittedDate', 'admitted_date', new Date().toISOString().slice(0, 10)),
+    status: normalizeStatus(getField(obj, 'status', 'status', 'ADMITTED')),
+    primaryDiagnosis: getField(obj, 'primaryDiagnosis', 'primary_diagnosis', 'Pending assessment'),
+    primaryClinician: getField(obj, 'primaryClinician', 'primary_clinician', 'Dr. Admin'),
+    allergies: getField(obj, 'allergies', 'allergies', [] as string[]),
+    location: {
+      lat: getField(locationRaw ?? {}, 'lat', 'lat', 51.5074),
+      lng: getField(locationRaw ?? {}, 'lng', 'lng', -0.1278),
+    },
+    vitals: vitalsRaw ? {
+      bloodPressureSystolic: getField(vitalsRaw, 'bloodPressureSystolic', 'blood_pressure_systolic', 120),
+      bloodPressureDiastolic: getField(vitalsRaw, 'bloodPressureDiastolic', 'blood_pressure_diastolic', 80),
+      heartRate: getField(vitalsRaw, 'heartRate', 'heart_rate', 72),
+      temperature: getField(vitalsRaw, 'temperature', 'temperature', 36.6),
+      oxygenSat: getField(vitalsRaw, 'oxygenSat', 'oxygen_sat', 98),
+      respiratoryRate: getField(vitalsRaw, 'respiratoryRate', 'respiratory_rate', 16),
+      recordedAt: getField(vitalsRaw, 'recordedAt', 'recorded_at', new Date().toISOString()),
+    } : undefined,
+  }
+}
+
 // ── EHR ──────────────────────────────────────────────────────────────────────
 
 /** Create a new Electronic Health Record for a patient */
@@ -48,15 +102,15 @@ export const runAql = (q: string, fetch = 50, offset = 0) =>
 
 /** Get all patients with enriched demographic and clinical summary */
 export const getPatients = () =>
-  request<Patient[]>('GET', '/api/patients')
+  request<unknown[]>('GET', '/api/patients').then(rows => rows.map(toPatient))
 
 /** Create a new patient (openEHR EHR + demographics) */
 export const createPatient = (data: Pick<Patient, 'firstName' | 'lastName'> & Partial<Patient>) =>
-  request<Patient>('POST', '/api/patients', data)
+  request<unknown>('POST', '/api/patients', data).then(toPatient)
 
 /** Get a single patient by EHR ID */
 export const getPatient = (ehrId: string) =>
-  request<Patient>('GET', `/api/patients/${ehrId}`)
+  request<unknown>('GET', `/api/patients/${ehrId}`).then(toPatient)
 
 /** Get vital sign trend for a patient (last 24 h) */
 export const getVitalTrend = (ehrId: string) =>

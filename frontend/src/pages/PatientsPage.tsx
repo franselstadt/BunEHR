@@ -37,8 +37,10 @@ const age = (dob: string) => Math.floor((Date.now() - new Date(dob).getTime()) /
 
 function PatientCard({ patient, onClick }: { patient: Patient; onClick: () => void }) {
   const wardColor = wardColors[patient.ward as keyof typeof wardColors] ?? '#3B82F6'
-  const statusColor = statusColors[patient.status]
+  const statusColor = statusColors[patient.status] ?? '#3B82F6'
   const isCritical = patient.status === 'CRITICAL'
+  const firstInitial = patient.firstName?.[0] ?? '?'
+  const lastInitial = patient.lastName?.[0] ?? '?'
 
   return (
     <Card sx={{ border: isCritical ? `1.5px solid #EF4444` : '1px solid #E2E8F0', position: 'relative' }}>
@@ -50,7 +52,7 @@ function PatientCard({ patient, onClick }: { patient: Patient; onClick: () => vo
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
             {/* Avatar with patient initials */}
             <Avatar sx={{ bgcolor: `${statusColor}18`, color: statusColor, width: 44, height: 44, fontWeight: 700, fontSize: '1rem' }}>
-              {patient.firstName[0]}{patient.lastName[0]}
+              {firstInitial}{lastInitial}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="subtitle2" fontWeight={700} noWrap>
@@ -87,7 +89,7 @@ function PatientCard({ patient, onClick }: { patient: Patient; onClick: () => vo
 
           {/* Footer */}
           <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Dr. {patient.primaryClinician.replace('Dr. ', '')}</Typography>
+            <Typography variant="caption" color="text.secondary">Dr. {(patient.primaryClinician ?? 'Admin').replace('Dr. ', '')}</Typography>
             <Typography variant="caption" color="text.secondary">Admitted {patient.admittedDate}</Typography>
           </Box>
         </CardContent>
