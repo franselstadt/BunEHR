@@ -9,6 +9,16 @@
  *  GET  /v1/finance            List financial records (filterable)
  *  POST /v1/finance            Create a financial record
  *  GET  /v1/finance/summary    Financial summary (totals, outstanding, etc.)
+ *  GET  /v1/finance/accounts   Chart of accounts
+ *  POST /v1/finance/accounts   Create account
+ *  POST /v1/finance/journal-entries   Post balanced journal entry
+ *  GET  /v1/finance/general-ledger     Ledger lines by account/date
+ *  GET  /v1/finance/trial-balance      Trial balance snapshot
+ *  GET  /v1/finance/audit              Finance and Rx audit events
+ *  GET  /v1/prescriptions              List prescriptions
+ *  POST /v1/prescriptions              Create prescription
+ *  GET  /v1/prescriptions/:id          Get prescription + fills
+ *  POST /v1/prescriptions/:id/fills    Record dispense event
  *  GET  /v1/medicare/:ehr_id   Get Medicare eligibility for a patient
  *  PUT  /v1/medicare/:ehr_id   Upsert Medicare eligibility
  *  POST /api/seed-clinical     Seed ICD-10 + procedure + finance data
@@ -16,20 +26,45 @@
  * Made by Frans Elstadt in San Francisco.
  */
 import { Hono } from 'hono'
-import { eq, like, and, ilike, sql } from 'drizzle-orm'
+import { eq, and, ilike, sql, desc, gte, lte } from 'drizzle-orm'
 import { db } from '../../infrastructure/database/client.ts'
 import {
   icd10Code, procedureCode, icd10ProcedureMap,
   financialRecord, medicareEligibility, ehr,
+  glAccount, glJournalEntry, glJournalLine, auditEvent,
+  prescription, prescriptionFill,
 } from '../../infrastructure/database/schema.ts'
 import {
   ICD10_CODES, PROCEDURE_CODES, ICD10_PROCEDURE_MAPS,
   SAMPLE_FINANCIAL_RECORDS, SAMPLE_MEDICARE,
+  GL_ACCOUNTS,
 } from '../../infrastructure/seed/ClinicalSeedData.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
 
 export function createClinicalFinanceController() {
   const app = new Hono()
+  const toMoney = (value: unknown) => Number(Number(value ?? 0).toFixed(2))
+  const entryNumber = () => `JE-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+
+  const logAudit = async (
+    eventType: string,
+    aggregateType: string,
+    aggregateId: string,
+    action: string,
+    payload: Record<string, unknown>,
+    actor = 'system',
+  ) => {
+    await db.insert(auditEvent).values({
+      id: newUuid(),
+      eventType,
+      aggregateType,
+      aggregateId,
+      action,
+      actor,
+      payload,
+      createdAt: new Date(),
+    })
+  }
 
   // ── ICD-10 ───────────────────────────────────────────────────────────────
 
@@ -268,6 +303,286 @@ export function createClinicalFinanceController() {
     return c.json(created[0], 201)
   })
 
+  // ── Chart of Accounts / Journals / Ledger ──────────────────────────────────
+
+  app.get('/finance/accounts', async (c) => {
+    const type = c.req.query('type')
+    const rows = await db.select().from(glAccount)
+      .where(type ? eq(glAccount.type, type) : undefined)
+      .orderBy(glAccount.code)
+    return c.json(rows)
+  })
+
+  app.post('/finance/accounts', async (c) => {
+    const body = await c.req.json() as Record<string, unknown>
+    if (!body.code || !body.name || !body.type) {
+      return c.json({ detail: 'code, name and type are required' }, 400)
+    }
+    const id = newUuid()
+    await db.insert(glAccount).values({
+      id,
+      code: String(body.code),
+      name: String(body.name),
+      type: String(body.type).toUpperCase(),
+      parentId: body.parent_id ? String(body.parent_id) : null,
+      isActive: body.is_active === undefined ? true : Boolean(body.is_active),
+      createdAt: new Date(),
+    })
+    await logAudit('ACCOUNT', 'GL_ACCOUNT', id, 'CREATE', body)
+    const row = await db.select().from(glAccount).where(eq(glAccount.id, id)).limit(1)
+    return c.json(row[0], 201)
+  })
+
+  app.post('/finance/journal-entries', async (c) => {
+    const body = await c.req.json() as {
+      entry_date?: string
+      description?: string
+      source_type?: string
+      source_id?: string
+      posted_by?: string
+      lines?: Array<{ account_id?: string; debit?: number; credit?: number; description?: string }>
+    }
+
+    if (!body.description || !body.lines || body.lines.length < 2) {
+      return c.json({ detail: 'description and at least two lines are required' }, 400)
+    }
+    const totalDebit = body.lines.reduce((s, l) => s + toMoney(l.debit), 0)
+    const totalCredit = body.lines.reduce((s, l) => s + toMoney(l.credit), 0)
+    if (Math.abs(totalDebit - totalCredit) > 0.001) {
+      return c.json({ detail: `Unbalanced entry. debit=${totalDebit} credit=${totalCredit}` }, 422)
+    }
+    if (body.lines.some(l => !l.account_id)) {
+      return c.json({ detail: 'Every line must specify account_id' }, 400)
+    }
+
+    const journalId = newUuid()
+    const number = entryNumber()
+    await db.transaction(async (tx) => {
+      await tx.insert(glJournalEntry).values({
+        id: journalId,
+        entryNumber: number,
+        entryDate: body.entry_date ? new Date(body.entry_date) : new Date(),
+        description: body.description!,
+        sourceType: body.source_type ?? null,
+        sourceId: body.source_id ?? null,
+        postedBy: body.posted_by ?? 'system',
+        status: 'POSTED',
+      })
+
+      for (let i = 0; i < body.lines!.length; i++) {
+        const line = body.lines![i]!
+        await tx.insert(glJournalLine).values({
+          id: newUuid(),
+          journalEntryId: journalId,
+          accountId: line.account_id!,
+          lineNumber: i + 1,
+          description: line.description ?? null,
+          debit: toMoney(line.debit).toString(),
+          credit: toMoney(line.credit).toString(),
+        })
+      }
+    })
+
+    await logAudit('JOURNAL', 'GL_JOURNAL_ENTRY', journalId, 'POST', {
+      entry_number: number,
+      description: body.description,
+      line_count: body.lines.length,
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+    }, body.posted_by ?? 'system')
+
+    const entry = await db.select().from(glJournalEntry).where(eq(glJournalEntry.id, journalId)).limit(1)
+    const lines = await db.select().from(glJournalLine).where(eq(glJournalLine.journalEntryId, journalId)).orderBy(glJournalLine.lineNumber)
+    return c.json({ ...entry[0], lines }, 201)
+  })
+
+  app.get('/finance/general-ledger', async (c) => {
+    const accountId = c.req.query('account_id')
+    const from = c.req.query('from')
+    const to = c.req.query('to')
+
+    const conditions = []
+    if (accountId) conditions.push(eq(glJournalLine.accountId, accountId))
+    if (from) conditions.push(gte(glJournalEntry.entryDate, new Date(from)))
+    if (to) conditions.push(lte(glJournalEntry.entryDate, new Date(to)))
+
+    const rows = await db.select({
+      entryId: glJournalEntry.id,
+      entryNumber: glJournalEntry.entryNumber,
+      entryDate: glJournalEntry.entryDate,
+      entryDescription: glJournalEntry.description,
+      lineId: glJournalLine.id,
+      lineNumber: glJournalLine.lineNumber,
+      accountId: glJournalLine.accountId,
+      debit: glJournalLine.debit,
+      credit: glJournalLine.credit,
+      lineDescription: glJournalLine.description,
+      accountCode: glAccount.code,
+      accountName: glAccount.name,
+      accountType: glAccount.type,
+    })
+      .from(glJournalLine)
+      .innerJoin(glJournalEntry, eq(glJournalLine.journalEntryId, glJournalEntry.id))
+      .innerJoin(glAccount, eq(glJournalLine.accountId, glAccount.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(glJournalEntry.entryDate, glJournalEntry.entryNumber, glJournalLine.lineNumber)
+
+    return c.json({ results: rows })
+  })
+
+  app.get('/finance/trial-balance', async (c) => {
+    const asOf = c.req.query('as_of')
+    const rows = await db.select({
+      accountId: glAccount.id,
+      accountCode: glAccount.code,
+      accountName: glAccount.name,
+      accountType: glAccount.type,
+      debit: sql<string>`coalesce(sum(${glJournalLine.debit}), '0')`,
+      credit: sql<string>`coalesce(sum(${glJournalLine.credit}), '0')`,
+    })
+      .from(glAccount)
+      .leftJoin(glJournalLine, eq(glJournalLine.accountId, glAccount.id))
+      .leftJoin(glJournalEntry, eq(glJournalLine.journalEntryId, glJournalEntry.id))
+      .where(asOf ? lte(glJournalEntry.entryDate, new Date(asOf)) : undefined)
+      .groupBy(glAccount.id, glAccount.code, glAccount.name, glAccount.type)
+      .orderBy(glAccount.code)
+
+    const totals = rows.reduce((acc, r) => ({
+      debit: acc.debit + Number(r.debit),
+      credit: acc.credit + Number(r.credit),
+    }), { debit: 0, credit: 0 })
+
+    return c.json({
+      asOf: asOf ?? null,
+      entries: rows.map((r) => ({
+        ...r,
+        debit: toMoney(r.debit),
+        credit: toMoney(r.credit),
+        balance: toMoney(Number(r.debit) - Number(r.credit)),
+      })),
+      totals: {
+        debit: toMoney(totals.debit),
+        credit: toMoney(totals.credit),
+        inBalance: Math.abs(totals.debit - totals.credit) < 0.001,
+      },
+    })
+  })
+
+  app.get('/finance/audit', async (c) => {
+    const aggregateType = c.req.query('aggregate_type')
+    const aggregateId = c.req.query('aggregate_id')
+    const eventType = c.req.query('event_type')
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '100', 10), 500)
+
+    const conditions = []
+    if (aggregateType) conditions.push(eq(auditEvent.aggregateType, aggregateType))
+    if (aggregateId) conditions.push(eq(auditEvent.aggregateId, aggregateId))
+    if (eventType) conditions.push(eq(auditEvent.eventType, eventType))
+
+    const rows = await db.select().from(auditEvent)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(auditEvent.createdAt))
+      .limit(limit)
+    return c.json({ results: rows })
+  })
+
+  // ── Prescriptions ───────────────────────────────────────────────────────────
+
+  app.get('/prescriptions', async (c) => {
+    const ehrId = c.req.query('ehr_id')
+    const status = c.req.query('status')
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '100', 10), 500)
+
+    const conditions = []
+    if (ehrId) conditions.push(eq(prescription.ehrId, ehrId))
+    if (status) conditions.push(eq(prescription.status, status))
+
+    const rows = await db.select().from(prescription)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(prescription.createdAt))
+      .limit(limit)
+    return c.json({ results: rows })
+  })
+
+  app.post('/prescriptions', async (c) => {
+    const body = await c.req.json() as Record<string, unknown>
+    if (!body.ehr_id || !body.medication_name || !body.dose || !body.route || !body.frequency || !body.quantity || !body.prescriber_name) {
+      return c.json({ detail: 'ehr_id, medication_name, dose, route, frequency, quantity and prescriber_name are required' }, 400)
+    }
+    const exists = await db.select({ id: ehr.id }).from(ehr).where(eq(ehr.id, String(body.ehr_id))).limit(1)
+    if (!exists[0]) return c.json({ detail: `EHR not found: ${String(body.ehr_id)}` }, 404)
+
+    const id = newUuid()
+    const rxNumber = `RX-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+    await db.insert(prescription).values({
+      id,
+      ehrId: String(body.ehr_id),
+      compositionId: body.composition_id ? String(body.composition_id) : null,
+      rxNumber,
+      medicationCode: body.medication_code ? String(body.medication_code) : null,
+      medicationName: String(body.medication_name),
+      dose: String(body.dose),
+      route: String(body.route),
+      frequency: String(body.frequency),
+      quantity: toMoney(body.quantity).toString(),
+      refills: Number(body.refills ?? 0),
+      status: String(body.status ?? 'ACTIVE').toUpperCase(),
+      startDate: new Date(String(body.start_date ?? new Date().toISOString())),
+      endDate: body.end_date ? new Date(String(body.end_date)) : null,
+      prescriberName: String(body.prescriber_name),
+      notes: body.notes ? String(body.notes) : null,
+      updatedAt: new Date(),
+    })
+
+    await logAudit('PRESCRIPTION', 'PRESCRIPTION', id, 'CREATE', {
+      ehr_id: body.ehr_id,
+      medication_name: body.medication_name,
+      quantity: body.quantity,
+    }, String(body.prescriber_name))
+
+    const row = await db.select().from(prescription).where(eq(prescription.id, id)).limit(1)
+    return c.json(row[0], 201)
+  })
+
+  app.get('/prescriptions/:id', async (c) => {
+    const id = c.req.param('id')
+    const rxRows = await db.select().from(prescription).where(eq(prescription.id, id)).limit(1)
+    if (!rxRows[0]) return c.json({ detail: `Prescription not found: ${id}` }, 404)
+    const fills = await db.select().from(prescriptionFill).where(eq(prescriptionFill.prescriptionId, id)).orderBy(desc(prescriptionFill.filledAt))
+    return c.json({ ...rxRows[0], fills })
+  })
+
+  app.post('/prescriptions/:id/fills', async (c) => {
+    const id = c.req.param('id')
+    const body = await c.req.json() as Record<string, unknown>
+    const rxRows = await db.select().from(prescription).where(eq(prescription.id, id)).limit(1)
+    if (!rxRows[0]) return c.json({ detail: `Prescription not found: ${id}` }, 404)
+    if (!body.quantity_dispensed || !body.pharmacy_name) {
+      return c.json({ detail: 'quantity_dispensed and pharmacy_name are required' }, 400)
+    }
+
+    const fillId = newUuid()
+    await db.insert(prescriptionFill).values({
+      id: fillId,
+      prescriptionId: id,
+      filledAt: body.filled_at ? new Date(String(body.filled_at)) : new Date(),
+      quantityDispensed: toMoney(body.quantity_dispensed).toString(),
+      pharmacyName: String(body.pharmacy_name),
+      dispensedBy: body.dispensed_by ? String(body.dispensed_by) : null,
+      status: String(body.status ?? 'FILLED'),
+      notes: body.notes ? String(body.notes) : null,
+    })
+
+    await logAudit('PRESCRIPTION_FILL', 'PRESCRIPTION', id, 'FILL', {
+      fill_id: fillId,
+      quantity_dispensed: body.quantity_dispensed,
+      pharmacy_name: body.pharmacy_name,
+    }, String(body.dispensed_by ?? 'pharmacy'))
+
+    const fill = await db.select().from(prescriptionFill).where(eq(prescriptionFill.id, fillId)).limit(1)
+    return c.json(fill[0], 201)
+  })
+
   // ── Medicare Eligibility ───────────────────────────────────────────────────
 
   /**
@@ -327,7 +642,7 @@ export function createClinicalFinanceController() {
    * sample financial records, and Medicare eligibility data.
    */
   app.post('/seed-clinical', async (c) => {
-    let icd10Count = 0, cptCount = 0, mapCount = 0, financeCount = 0, medicareCount = 0
+    let icd10Count = 0, cptCount = 0, mapCount = 0, financeCount = 0, medicareCount = 0, glAccountCount = 0
 
     // ICD-10 codes
     for (const code of ICD10_CODES) {
@@ -358,6 +673,19 @@ export function createClinicalFinanceController() {
           rvuTotal:        proc.rvuTotal?.toString() ?? null,
         }).onConflictDoNothing()
         cptCount++
+      } catch { /* skip */ }
+    }
+
+    // Chart of accounts
+    for (const account of GL_ACCOUNTS) {
+      try {
+        await db.insert(glAccount).values({
+          id: newUuid(),
+          code: account.code,
+          name: account.name,
+          type: account.type,
+        }).onConflictDoNothing()
+        glAccountCount++
       } catch { /* skip */ }
     }
 
@@ -411,6 +739,7 @@ export function createClinicalFinanceController() {
       message: 'Clinical data seeded successfully',
       icd10Codes: icd10Count, procedureCodes: cptCount,
       mappings: mapCount, financialRecords: financeCount, medicareRecords: medicareCount,
+      glAccounts: glAccountCount,
     })
   })
 

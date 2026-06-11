@@ -9,6 +9,7 @@ import { services } from '../infrastructure/config/DependencyInjection.ts'
 import { createOpenEhrController } from './Controllers/OpenEhrController.ts'
 import { createPatientsController } from './Controllers/PatientsController.ts'
 import { createClinicalFinanceController } from './Controllers/ClinicalFinanceController.ts'
+import { createConformanceController } from './Controllers/ConformanceController.ts'
 import { deepSnakeCase } from './Middleware/JsonNamingMiddleware.ts'
 import { openApiSpec } from './OpenApiSpec.ts'
 
@@ -54,6 +55,7 @@ export function buildApp(): Hono {
   app.get('/docs', swaggerUI({ url: '/api-docs' }))
 
   app.route('/', createOpenEhrController(services))
+  app.route('/', createConformanceController())
   app.route('/api/patients', createPatientsController(services.patients))
   app.route('/v1', createClinicalFinanceController())
   app.route('/api', createClinicalFinanceController())

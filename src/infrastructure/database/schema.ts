@@ -1,6 +1,7 @@
 import {
   pgTable, text, boolean, timestamp, jsonb, index, uniqueIndex,
   numeric,
+  integer,
 } from 'drizzle-orm/pg-core'
 
 // ── EHR ──────────────────────────────────────────────────────────────────────
@@ -205,6 +206,145 @@ export const medicareEligibility = pgTable('medicare_eligibility', {
   status:          text('status').notNull().default('UNKNOWN'),
 })
 
+// ── PATIENT PROFILE & VITALS ──────────────────────────────────────────────────
+
+export const patientProfile = pgTable('patient_profile', {
+  ehrId:             text('ehr_id').primaryKey().references(() => ehr.id, { onDelete: 'cascade' }),
+  subjectId:         text('subject_id').notNull(),
+  firstName:         text('first_name').notNull(),
+  lastName:          text('last_name').notNull(),
+  dateOfBirth:       text('date_of_birth').notNull(),
+  gender:            text('gender').notNull(),
+  bloodType:         text('blood_type').notNull(),
+  ward:              text('ward').notNull(),
+  room:              text('room').notNull(),
+  admittedDate:      text('admitted_date').notNull(),
+  status:            text('status').notNull(),
+  primaryDiagnosis:  text('primary_diagnosis').notNull(),
+  primaryClinician:  text('primary_clinician').notNull(),
+  allergies:         text('allergies').array().notNull().default([]),
+  locationLat:       numeric('location_lat', { precision: 9, scale: 6 }).notNull(),
+  locationLng:       numeric('location_lng', { precision: 9, scale: 6 }).notNull(),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('uq_patient_profile_subject').on(t.subjectId),
+  index('idx_patient_profile_ward').on(t.ward),
+  index('idx_patient_profile_status').on(t.status),
+])
+
+export const patientVital = pgTable('patient_vital', {
+  id:                     text('id').primaryKey(),
+  ehrId:                  text('ehr_id').notNull().references(() => patientProfile.ehrId, { onDelete: 'cascade' }),
+  bloodPressureSystolic:  integer('bp_systolic').notNull(),
+  bloodPressureDiastolic: integer('bp_diastolic').notNull(),
+  heartRate:              integer('heart_rate').notNull(),
+  temperature:            numeric('temperature', { precision: 4, scale: 1 }).notNull(),
+  oxygenSat:              integer('oxygen_sat').notNull(),
+  respiratoryRate:        integer('respiratory_rate').notNull(),
+  recordedAt:             timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt:              timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_patient_vital_ehr_time').on(t.ehrId, t.recordedAt),
+])
+
+// ── GENERAL LEDGER & AUDIT ────────────────────────────────────────────────────
+
+export const glAccount = pgTable('gl_account', {
+  id:        text('id').primaryKey(),
+  code:      text('code').notNull().unique(),
+  name:      text('name').notNull(),
+  type:      text('type').notNull(), // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
+  parentId:  text('parent_id'),
+  isActive:  boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_gl_account_type').on(t.type),
+])
+
+export const glJournalEntry = pgTable('gl_journal_entry', {
+  id:          text('id').primaryKey(),
+  entryNumber: text('entry_number').notNull().unique(),
+  entryDate:   timestamp('entry_date', { withTimezone: true }).notNull(),
+  description: text('description').notNull(),
+  sourceType:  text('source_type'),
+  sourceId:    text('source_id'),
+  postedBy:    text('posted_by').notNull().default('system'),
+  status:      text('status').notNull().default('POSTED'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_gl_journal_entry_date').on(t.entryDate),
+])
+
+export const glJournalLine = pgTable('gl_journal_line', {
+  id:            text('id').primaryKey(),
+  journalEntryId: text('journal_entry_id').notNull().references(() => glJournalEntry.id, { onDelete: 'cascade' }),
+  accountId:     text('account_id').notNull().references(() => glAccount.id),
+  lineNumber:    integer('line_number').notNull(),
+  description:   text('description'),
+  debit:         numeric('debit', { precision: 14, scale: 2 }).notNull().default('0'),
+  credit:        numeric('credit', { precision: 14, scale: 2 }).notNull().default('0'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_gl_journal_line_journal').on(t.journalEntryId),
+  index('idx_gl_journal_line_account').on(t.accountId),
+])
+
+export const auditEvent = pgTable('audit_event', {
+  id:            text('id').primaryKey(),
+  eventType:     text('event_type').notNull(),
+  aggregateType: text('aggregate_type').notNull(),
+  aggregateId:   text('aggregate_id').notNull(),
+  action:        text('action').notNull(),
+  actor:         text('actor').notNull(),
+  payload:       jsonb('payload'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_audit_event_aggregate').on(t.aggregateType, t.aggregateId),
+  index('idx_audit_event_created').on(t.createdAt),
+])
+
+// ── PRESCRIPTIONS ─────────────────────────────────────────────────────────────
+
+export const prescription = pgTable('prescription', {
+  id:             text('id').primaryKey(),
+  ehrId:          text('ehr_id').notNull().references(() => ehr.id, { onDelete: 'cascade' }),
+  compositionId:  text('composition_id'),
+  rxNumber:       text('rx_number').notNull().unique(),
+  medicationCode: text('medication_code'),
+  medicationName: text('medication_name').notNull(),
+  dose:           text('dose').notNull(),
+  route:          text('route').notNull(),
+  frequency:      text('frequency').notNull(),
+  quantity:       numeric('quantity', { precision: 10, scale: 2 }).notNull(),
+  refills:        integer('refills').notNull().default(0),
+  status:         text('status').notNull().default('ACTIVE'),
+  startDate:      timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate:        timestamp('end_date', { withTimezone: true }),
+  prescriberName: text('prescriber_name').notNull(),
+  notes:          text('notes'),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_prescription_ehr').on(t.ehrId),
+  index('idx_prescription_status').on(t.status),
+])
+
+export const prescriptionFill = pgTable('prescription_fill', {
+  id:                text('id').primaryKey(),
+  prescriptionId:    text('prescription_id').notNull().references(() => prescription.id, { onDelete: 'cascade' }),
+  filledAt:          timestamp('filled_at', { withTimezone: true }).notNull(),
+  quantityDispensed: numeric('quantity_dispensed', { precision: 10, scale: 2 }).notNull(),
+  pharmacyName:      text('pharmacy_name').notNull(),
+  dispensedBy:       text('dispensed_by'),
+  status:            text('status').notNull().default('FILLED'),
+  notes:             text('notes'),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_prescription_fill_rx').on(t.prescriptionId),
+  index('idx_prescription_fill_date').on(t.filledAt),
+])
+
 // ── Inferred types ────────────────────────────────────────────────────────────
 
 export type EhrRow                  = typeof ehr.$inferSelect
@@ -215,3 +355,11 @@ export type ContributionVersionRow  = typeof contributionVersion.$inferSelect
 export type DirectoryRow            = typeof directory.$inferSelect
 export type StoredQueryRow          = typeof storedQuery.$inferSelect
 export type TemplateDefinitionRow   = typeof templateDefinition.$inferSelect
+export type PatientProfileRow       = typeof patientProfile.$inferSelect
+export type PatientVitalRow         = typeof patientVital.$inferSelect
+export type GlAccountRow            = typeof glAccount.$inferSelect
+export type GlJournalEntryRow       = typeof glJournalEntry.$inferSelect
+export type GlJournalLineRow        = typeof glJournalLine.$inferSelect
+export type AuditEventRow           = typeof auditEvent.$inferSelect
+export type PrescriptionRow         = typeof prescription.$inferSelect
+export type PrescriptionFillRow     = typeof prescriptionFill.$inferSelect

@@ -41,15 +41,15 @@ export function createPatientsController(patients: IPatientService) {
     }
   })
 
-  app.get('/:ehrId', (c) => {
-    const patient = patients.getById(c.req.param('ehrId'))
+  app.get('/:ehrId', async (c) => {
+    const patient = await patients.getById(c.req.param('ehrId'))
     if (!patient) return c.json({ detail: `Patient not found: ${c.req.param('ehrId')}` }, 404)
     return c.json(patient)
   })
 
-  app.get('/:ehrId/vitals', (c) => {
+  app.get('/:ehrId/vitals', async (c) => {
     try {
-      return c.json(patients.getVitalTrend(c.req.param('ehrId')))
+      return c.json(await patients.getVitalTrend(c.req.param('ehrId')))
     } catch (e) {
       return handleError(e, c)
     }

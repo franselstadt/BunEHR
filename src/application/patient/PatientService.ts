@@ -1,45 +1,31 @@
-import type { SamplePatient } from '../../infrastructure/seed/SamplePatients.ts'
-import {
-  SAMPLE_PATIENTS, customPatients, generateVitalTrend, getAllPatients,
-} from '../../infrastructure/seed/SamplePatients.ts'
+import { SAMPLE_PATIENTS } from '../../infrastructure/seed/SamplePatients.ts'
 import type { IEhrService } from '../contracts/IEhrService.ts'
 import type { IPatientService } from '../contracts/IPatientService.ts'
 import type { CreatePatientRequest } from './models/CreatePatientRequest.ts'
-import type { PatientDto } from './models/PatientDto.ts'
-import type { Db } from '../../infrastructure/database/client.ts'
-import { ehr } from '../../infrastructure/database/schema.ts'
+import type { PatientDto, VitalTrendPoint } from './models/PatientDto.ts'
+import type { IPatientRepository } from '../../domain/patient/repositories/IPatientRepository.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
 
 const defaultLocation = () => ({ lat: 51.5074, lng: -0.1278 })
 
 export class PatientService implements IPatientService {
   constructor(
-    private readonly db: Db,
+    private readonly repo: IPatientRepository,
     private readonly ehrService: IEhrService,
   ) {}
 
   async list(): Promise<PatientDto[]> {
-    try {
-      const ehrRows = await this.db.select({ id: ehr.id, subjectId: ehr.subjectId }).from(ehr)
-      const bySubject = new Map(ehrRows.map(r => [r.subjectId, r.id]))
-      return getAllPatients().map(p => ({
-        ...p,
-        ehrId: bySubject.get(p.subjectId) ?? p.ehrId,
-        _hasRealEhr: bySubject.has(p.subjectId),
-      }))
-    } catch {
-      return getAllPatients()
-    }
+    return this.repo.list()
   }
 
-  getById(ehrId: string): PatientDto | undefined {
-    return getAllPatients().find(p => p.ehrId === ehrId)
+  getById(ehrId: string): Promise<PatientDto | undefined> {
+    return this.repo.findByEhrId(ehrId)
   }
 
-  getVitalTrend(ehrId: string) {
-    const patient = this.getById(ehrId)
+  async getVitalTrend(ehrId: string): Promise<VitalTrendPoint[]> {
+    const patient = await this.getById(ehrId)
     if (!patient) throw new Error(`Patient not found: ${ehrId}`)
-    return generateVitalTrend(patient)
+    return generateTrendFromPatient(patient)
   }
 
   async create(request: CreatePatientRequest): Promise<PatientDto> {
@@ -47,7 +33,7 @@ export class PatientService implements IPatientService {
     const subjectId = `sub-${newUuid().slice(0, 8)}`
     const today = new Date().toISOString().slice(0, 10)
 
-    const patient: SamplePatient = {
+    const patient: PatientDto = {
       ehrId,
       subjectId,
       firstName: request.firstName.trim(),
@@ -78,23 +64,49 @@ export class PatientService implements IPatientService {
       externalRef: { id: { value: subjectId }, namespace: 'local', type: 'PERSON' },
     })
 
-    customPatients.push(patient)
-    return patient
+    return this.repo.upsert(patient, patient.vitals)
   }
 
-  async seedSampleEhRs(onAdmitted: (patient: SamplePatient) => void): Promise<number> {
+  async seedSampleEhRs(onAdmitted: (patient: PatientDto) => void): Promise<number> {
     let count = 0
     for (const patient of SAMPLE_PATIENTS) {
       try {
         await this.ehrService.createEhr(patient.ehrId, {
           externalRef: { id: { value: patient.subjectId }, namespace: 'local', type: 'PERSON' },
         })
+        const saved = await this.repo.upsert(patient, patient.vitals)
         count++
-        onAdmitted(patient)
+        onAdmitted(saved)
       } catch {
-        // already seeded
+        const saved = await this.repo.upsert(patient, patient.vitals)
+        onAdmitted(saved)
       }
     }
     return count
   }
+}
+
+function generateTrendFromPatient(patient: PatientDto): VitalTrendPoint[] {
+  const base = patient.vitals ?? {
+    bloodPressureSystolic: 120,
+    bloodPressureDiastolic: 80,
+    heartRate: 72,
+    oxygenSat: 98,
+    temperature: 36.6,
+    respiratoryRate: 16,
+    recordedAt: new Date().toISOString(),
+  }
+  const now = new Date()
+  return Array.from({ length: 24 }, (_, i) => {
+    const t = new Date(now.getTime() - (23 - i) * 3_600_000)
+    const jitter = (range: number) => (Math.random() - 0.5) * range
+    return {
+      time: `${t.getHours().toString().padStart(2, '0')}:00`,
+      systolic: Math.round(base.bloodPressureSystolic + jitter(12)),
+      diastolic: Math.round(base.bloodPressureDiastolic + jitter(8)),
+      heartRate: Math.round(base.heartRate + jitter(10)),
+      spo2: Math.min(100, Math.round(base.oxygenSat + jitter(3))),
+      temp: parseFloat((base.temperature + jitter(0.4)).toFixed(1)),
+    }
+  })
 }

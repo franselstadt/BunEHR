@@ -17,8 +17,9 @@ import {
 import {
   ExpandMore as ExpandIcon, PlayArrow as RunIcon,
   School as LearnIcon, Code as QueryIcon, Settings as SettingsIcon,
+  AutoAwesome as AiIcon,
 } from '@mui/icons-material'
-import { runAql } from '../api/ehrClient.ts'
+import { runAql, runAqlFromPrompt } from '../api/ehrClient.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
 import type { AqlResult } from '../types/openehr.ts'
 
@@ -92,7 +93,10 @@ export default function OpenEHRPage() {
   const [aql, setAql] = useState(PRESET_QUERIES[0]!.q)
   const [result, setResult] = useState<AqlResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiInfo, setAiInfo] = useState<{ provider: string; model: string; usedFallback: boolean } | null>(null)
   const [serverUrl, setServerUrl] = useState('http://localhost:8080')
 
   const handleRunQuery = async () => {
@@ -104,6 +108,20 @@ export default function OpenEHRPage() {
       setError(e instanceof Error ? e.message : 'Query failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRunAiQuery = async () => {
+    setAiLoading(true); setError(null); setResult(null); setAiInfo(null)
+    try {
+      const res = await runAqlFromPrompt(aiPrompt, 50)
+      setAql(res.generatedQuery)
+      setResult(res.result)
+      setAiInfo({ provider: res.provider, model: res.model, usedFallback: res.usedFallback })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'AI query failed')
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -231,6 +249,24 @@ export default function OpenEHRPage() {
               <CardContent>
                 <Typography variant="h6" gutterBottom>AQL Query Editor</Typography>
                 <TextField
+                  fullWidth
+                  size="small"
+                  label="Ask in plain English"
+                  placeholder="Example: show all EHR IDs and creation time"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  sx={{ mb: 1.5 }}
+                />
+                <Button
+                  variant="outlined"
+                  startIcon={aiLoading ? <CircularProgress size={16} color="inherit" /> : <AiIcon />}
+                  onClick={handleRunAiQuery}
+                  disabled={aiLoading || !aiPrompt.trim()}
+                  sx={{ mb: 2, mr: 1 }}
+                >
+                  {aiLoading ? 'Generating + Running…' : 'AI Generate + Run'}
+                </Button>
+                <TextField
                   fullWidth multiline rows={5}
                   value={aql} onChange={e => setAql(e.target.value)}
                   placeholder="SELECT e/ehr_id/value FROM EHR e"
@@ -242,6 +278,12 @@ export default function OpenEHRPage() {
                 </Button>
 
                 {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+                {aiInfo && (
+                  <Alert severity={aiInfo.usedFallback ? 'warning' : 'success'} sx={{ mt: 2 }}>
+                    AI provider: <strong>{aiInfo.provider}</strong> · model: <strong>{aiInfo.model}</strong>
+                    {aiInfo.usedFallback ? ' · using local fallback query template' : ''}
+                  </Alert>
+                )}
 
                 {result && (
                   <Box sx={{ mt: 2 }}>

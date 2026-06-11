@@ -1,12 +1,4 @@
-/**
- * Sample patient dataset shared between the API and seed script.
- * See frontend/src/api/samplePatients.ts for the full dataset with location data.
- *
- * This server-side version is used for:
- *  - /api/patients  endpoint
- *  - /api/patients/:id/vitals endpoint
- *  - POST /api/seed endpoint
- */
+/** Sample patient dataset used for database seeding. */
 
 export interface VitalSigns {
   bloodPressureSystolic: number; bloodPressureDiastolic: number
@@ -38,27 +30,3 @@ export const SAMPLE_PATIENTS: SamplePatient[] = [
   { ehrId: 'ehr-012', subjectId: 'sub-012', firstName: 'Ibrahim', lastName: 'Hassan', dateOfBirth: '1975-11-20', gender: 'male', bloodType: 'O-', ward: 'Emergency', room: 'ED-12', admittedDate: '2026-06-10', status: 'ACTIVE', primaryDiagnosis: 'Severe asthma exacerbation', primaryClinician: 'Dr. Raj Patel', allergies: ['NSAIDs', 'Beta-blockers'], location: o(-0.003, -0.003), vitals: { bloodPressureSystolic: 115, bloodPressureDiastolic: 72, heartRate: 105, temperature: 37.0, oxygenSat: 93, respiratoryRate: 26, recordedAt: '2026-06-10T13:45:00Z' } },
 ]
 
-/** Patients created at runtime via POST /api/patients (demo in-memory store) */
-export const customPatients: SamplePatient[] = []
-
-export function getAllPatients(): SamplePatient[] {
-  return [...SAMPLE_PATIENTS, ...customPatients]
-}
-
-/** Generate 24-hour vital sign trend (hourly readings) */
-export function generateVitalTrend(patient: SamplePatient) {
-  const base = patient.vitals ?? { bloodPressureSystolic: 120, bloodPressureDiastolic: 80, heartRate: 72, oxygenSat: 98, temperature: 36.6, respiratoryRate: 16, recordedAt: new Date().toISOString() }
-  const now = new Date()
-  return Array.from({ length: 24 }, (_, i) => {
-    const t = new Date(now.getTime() - (23 - i) * 3_600_000)
-    const j = (r: number) => (Math.random() - 0.5) * r
-    return {
-      time:      `${t.getHours().toString().padStart(2,'0')}:00`,
-      systolic:  Math.round(base.bloodPressureSystolic + j(12)),
-      diastolic: Math.round(base.bloodPressureDiastolic + j(8)),
-      heartRate: Math.round(base.heartRate + j(10)),
-      spo2:      Math.min(100, Math.round(base.oxygenSat + j(3))),
-      temp:      parseFloat((base.temperature + j(0.4)).toFixed(1)),
-    }
-  })
-}

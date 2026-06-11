@@ -17,6 +17,89 @@ const getIfMatch = (c: { req: { header: (k: string) => string | undefined } }): 
   return v
 }
 
+const HF_API_URL = process.env['HF_API_URL'] ?? 'https://api-inference.huggingface.co/models/google/flan-t5-base'
+const HF_API_TOKEN = process.env['HF_API_TOKEN']
+
+const fallbackAqlFromPrompt = (prompt: string): string => {
+  const text = prompt.toLowerCase()
+  if (text.includes('composition') || text.includes('clinical document')) {
+    return 'SELECT e/ehr_id/value, c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c'
+  }
+  if (text.includes('recent') || text.includes('latest')) {
+    return 'SELECT e/ehr_id/value, e/time_created/value FROM EHR e ORDER BY e/time_created/value DESC'
+  }
+  return 'SELECT e/ehr_id/value, e/time_created/value FROM EHR e'
+}
+
+const extractAql = (raw: string): string => {
+  const cleaned = raw.replace(/```[a-z]*|```/gi, '').trim()
+  const firstSelect = cleaned.toUpperCase().indexOf('SELECT ')
+  if (firstSelect === -1) return cleaned
+  return cleaned.slice(firstSelect).trim()
+}
+
+const generateAqlWithAi = async (prompt: string): Promise<{ query: string; provider: string; model: string; usedFallback: boolean }> => {
+  const instruction = [
+    'You are an OpenEHR AQL assistant.',
+    'Convert the user request into a valid AQL query.',
+    'Return only one AQL query and nothing else.',
+    'Use common OpenEHR paths such as e/ehr_id/value, e/time_created/value, c/uid/value, c/name/value.',
+    '',
+    `User request: ${prompt}`,
+  ].join('\n')
+
+  if (!HF_API_TOKEN) {
+    return {
+      query: fallbackAqlFromPrompt(prompt),
+      provider: 'local-fallback',
+      model: 'heuristic-aql',
+      usedFallback: true,
+    }
+  }
+
+  const res = await fetch(HF_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${HF_API_TOKEN}`,
+    },
+    body: JSON.stringify({
+      inputs: instruction,
+      parameters: {
+        max_new_tokens: 180,
+        temperature: 0.1,
+        return_full_text: false,
+      },
+    }),
+  })
+
+  if (!res.ok) throw new Error(`AI provider error: ${res.status}`)
+  const data = await res.json() as unknown
+  const first = Array.isArray(data) ? data[0] : data
+  const output = String(
+    (first as { generated_text?: string; summary_text?: string; translation_text?: string } | undefined)?.generated_text
+      ?? (first as { summary_text?: string } | undefined)?.summary_text
+      ?? (first as { translation_text?: string } | undefined)?.translation_text
+      ?? '',
+  ).trim()
+
+  const query = extractAql(output)
+  if (!query.toUpperCase().startsWith('SELECT ')) {
+    return {
+      query: fallbackAqlFromPrompt(prompt),
+      provider: 'local-fallback',
+      model: 'heuristic-aql',
+      usedFallback: true,
+    }
+  }
+  return {
+    query,
+    provider: 'huggingface',
+    model: HF_API_URL.split('/').at(-1) ?? 'unknown-model',
+    usedFallback: false,
+  }
+}
+
 /** OpenEhrController — all /v1 openEHR REST endpoints */
 export function createOpenEhrController(svc: AppServices) {
   const app = new Hono()
@@ -193,6 +276,27 @@ export function createOpenEhrController(svc: AppServices) {
   })
 
   // ── QUERY ───────────────────────────────────────────────────────────────────
+
+  app.post('/v1/query/aql/assist', async (c) => {
+    try {
+      const body = c.req.header('content-type')?.includes('application/json')
+        ? await c.req.json() as { prompt?: string; fetch?: number; offset?: number }
+        : { prompt: '' }
+      const prompt = (body.prompt ?? '').trim()
+      if (!prompt) return c.json({ detail: 'prompt is required' }, 400)
+
+      const generated = await generateAqlWithAi(prompt)
+      const result = await svc.query.executeAql(generated.query, body.offset, body.fetch)
+      return c.json({
+        prompt,
+        generatedQuery: generated.query,
+        provider: generated.provider,
+        model: generated.model,
+        usedFallback: generated.usedFallback,
+        result,
+      })
+    } catch (e) { return handleError(e, c) }
+  })
 
   app.get('/v1/query/aql', async (c) => {
     try {

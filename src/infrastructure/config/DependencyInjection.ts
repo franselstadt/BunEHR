@@ -5,6 +5,7 @@ import { CompositionRepository } from '../database/repositories/CompositionRepos
 import { ContributionRepository } from '../database/repositories/ContributionRepository.ts'
 import { DirectoryRepository } from '../database/repositories/DirectoryRepository.ts'
 import { QueryRepository, DefinitionRepository } from '../database/repositories/QueryRepository.ts'
+import { PatientRepository } from '../database/repositories/PatientRepository.ts'
 import { EhrService } from '../../application/ehr/EhrService.ts'
 import { CompositionService } from '../../application/composition/CompositionService.ts'
 import { ContributionService } from '../../application/contribution/ContributionService.ts'
@@ -21,6 +22,7 @@ function registerServices(): AppServices {
   const directoryRepository   = new DirectoryRepository(db)
   const queryRepository       = new QueryRepository(db)
   const definitionRepository  = new DefinitionRepository(db)
+  const patientRepository     = new PatientRepository(db)
 
   const ehrService = new EhrService(ehrRepository)
 
@@ -31,7 +33,7 @@ function registerServices(): AppServices {
     directory:    new DirectoryService(directoryRepository),
     query:        new QueryService(queryRepository),
     definition:   new DefinitionService(definitionRepository),
-    patients:     new PatientService(db, ehrService),
+    patients:     new PatientService(patientRepository, ehrService),
   }
 }
 

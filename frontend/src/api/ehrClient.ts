@@ -98,6 +98,31 @@ export const getEhrBySubject = (subjectId: string, namespace = 'local') =>
 export const runAql = (q: string, fetch = 50, offset = 0) =>
   request<AqlResult>('POST', '/v1/query/aql', { q, fetch, offset })
 
+export interface AqlAssistResponse {
+  prompt: string
+  generatedQuery: string
+  provider: string
+  model: string
+  usedFallback: boolean
+  result: AqlResult
+}
+
+const toAqlAssistResponse = (raw: unknown): AqlAssistResponse => {
+  const obj = (raw ?? {}) as Record<string, unknown>
+  const result = (obj['result'] ?? {}) as AqlResult
+  return {
+    prompt: String(obj['prompt'] ?? ''),
+    generatedQuery: String(obj['generatedQuery'] ?? obj['generated_query'] ?? ''),
+    provider: String(obj['provider'] ?? ''),
+    model: String(obj['model'] ?? ''),
+    usedFallback: Boolean(obj['usedFallback'] ?? obj['used_fallback'] ?? false),
+    result,
+  }
+}
+
+export const runAqlFromPrompt = (prompt: string, fetch = 50, offset = 0) =>
+  request<unknown>('POST', '/v1/query/aql/assist', { prompt, fetch, offset }).then(toAqlAssistResponse)
+
 // ── Patient aggregate API (custom BunEHR extension) ─────────────────────────
 
 /** Get all patients with enriched demographic and clinical summary */

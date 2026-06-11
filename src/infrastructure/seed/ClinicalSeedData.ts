@@ -408,3 +408,22 @@ export const SAMPLE_MEDICARE = [
   { ehrId: 'ehr-002', subjectId: 'sub-002', medicareId: null, partA: false, partB: false, partC: false, partD: false, planName: null, effectiveDate: null, status: 'INELIGIBLE' },
   { ehrId: 'ehr-003', subjectId: 'sub-003', medicareId: null, partA: false, partB: false, partC: false, partD: false, planName: null, effectiveDate: null, status: 'INELIGIBLE' },
 ]
+
+export interface GlAccountSeed {
+  code: string
+  name: string
+  type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE'
+}
+
+export const GL_ACCOUNTS: GlAccountSeed[] = [
+  { code: '1000', name: 'Cash', type: 'ASSET' },
+  { code: '1100', name: 'Accounts Receivable', type: 'ASSET' },
+  { code: '1200', name: 'Allowance for Doubtful Accounts', type: 'ASSET' },
+  { code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+  { code: '2100', name: 'Accrued Payroll', type: 'LIABILITY' },
+  { code: '3000', name: 'Retained Earnings', type: 'EQUITY' },
+  { code: '4000', name: 'Patient Service Revenue', type: 'REVENUE' },
+  { code: '4100', name: 'Other Operating Revenue', type: 'REVENUE' },
+  { code: '5000', name: 'Clinical Supplies Expense', type: 'EXPENSE' },
+  { code: '5100', name: 'Provider Compensation Expense', type: 'EXPENSE' },
+]
