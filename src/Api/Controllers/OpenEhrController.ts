@@ -8,6 +8,9 @@ import { handleError } from '../Middleware/ExceptionMiddleware.ts'
 import { deepCamelCase } from '../Middleware/JsonNamingMiddleware.ts'
 import { PreconditionRequiredError } from '../../domain/shared/DomainErrors.ts'
 import type { AppServices } from '../../application/contracts/AppServices.ts'
+import { db } from '../../infrastructure/database/client.ts'
+import { composition as compositionTable, patientProfile } from '../../infrastructure/database/schema.ts'
+import { and, desc, eq } from 'drizzle-orm'
 
 const asDomain = <T>(v: unknown): T => deepCamelCase(v) as T
 
@@ -18,7 +21,11 @@ const getIfMatch = (c: { req: { header: (k: string) => string | undefined } }): 
 }
 
 const HF_API_URL = process.env['HF_API_URL'] ?? 'https://api-inference.huggingface.co/models/google/flan-t5-base'
-const HF_API_TOKEN = process.env['HF_API_TOKEN']
+const HF_API_TOKEN =
+  process.env['HF_API_TOKEN']
+  ?? process.env['HUGGINGFACE_API_KEY']
+  ?? process.env['HF_TOKEN']
+  ?? process.env['HUGGING_FACE_HUB_TOKEN']
 
 const fallbackAqlFromPrompt = (prompt: string): string => {
   const text = prompt.toLowerCase()
@@ -48,55 +55,66 @@ const generateAqlWithAi = async (prompt: string): Promise<{ query: string; provi
     `User request: ${prompt}`,
   ].join('\n')
 
-  if (!HF_API_TOKEN) {
-    return {
-      query: fallbackAqlFromPrompt(prompt),
-      provider: 'local-fallback',
-      model: 'heuristic-aql',
-      usedFallback: true,
-    }
-  }
-
-  const res = await fetch(HF_API_URL, {
-    method: 'POST',
-    headers: {
+  try {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${HF_API_TOKEN}`,
-    },
-    body: JSON.stringify({
-      inputs: instruction,
-      parameters: {
-        max_new_tokens: 180,
-        temperature: 0.1,
-        return_full_text: false,
-      },
-    }),
-  })
+    }
+    if (HF_API_TOKEN) headers['Authorization'] = `Bearer ${HF_API_TOKEN}`
 
-  if (!res.ok) throw new Error(`AI provider error: ${res.status}`)
-  const data = await res.json() as unknown
-  const first = Array.isArray(data) ? data[0] : data
-  const output = String(
-    (first as { generated_text?: string; summary_text?: string; translation_text?: string } | undefined)?.generated_text
-      ?? (first as { summary_text?: string } | undefined)?.summary_text
-      ?? (first as { translation_text?: string } | undefined)?.translation_text
-      ?? '',
-  ).trim()
+    const res = await fetch(HF_API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        inputs: instruction,
+        parameters: {
+          max_new_tokens: 180,
+          temperature: 0.1,
+          return_full_text: false,
+        },
+      }),
+    })
 
-  const query = extractAql(output)
-  if (!query.toUpperCase().startsWith('SELECT ')) {
+    if (!res.ok) {
+      return {
+        query: fallbackAqlFromPrompt(prompt),
+        provider: 'local-fallback',
+        model: `heuristic-aql (provider ${res.status})`,
+        usedFallback: true,
+      }
+    }
+
+    const data = await res.json() as unknown
+    const first = Array.isArray(data) ? data[0] : data
+    const output = String(
+      (first as { generated_text?: string; summary_text?: string; translation_text?: string } | undefined)?.generated_text
+        ?? (first as { summary_text?: string } | undefined)?.summary_text
+        ?? (first as { translation_text?: string } | undefined)?.translation_text
+        ?? '',
+    ).trim()
+
+    const query = extractAql(output)
+    if (!query.toUpperCase().startsWith('SELECT ')) {
+      return {
+        query: fallbackAqlFromPrompt(prompt),
+        provider: 'local-fallback',
+        model: 'heuristic-aql',
+        usedFallback: true,
+      }
+    }
+
+    return {
+      query,
+      provider: 'huggingface',
+      model: HF_API_URL.split('/').at(-1) ?? 'unknown-model',
+      usedFallback: false,
+    }
+  } catch {
     return {
       query: fallbackAqlFromPrompt(prompt),
       provider: 'local-fallback',
       model: 'heuristic-aql',
       usedFallback: true,
     }
-  }
-  return {
-    query,
-    provider: 'huggingface',
-    model: HF_API_URL.split('/').at(-1) ?? 'unknown-model',
-    usedFallback: false,
   }
 }
 
@@ -276,6 +294,62 @@ export function createOpenEhrController(svc: AppServices) {
   })
 
   // ── QUERY ───────────────────────────────────────────────────────────────────
+
+  app.get('/api/compositions', async (c) => {
+    try {
+      const ehrId = c.req.query('ehr_id')
+      const limit = Math.min(parseInt(c.req.query('limit') ?? '100', 10), 500)
+      const offset = parseInt(c.req.query('offset') ?? '0', 10)
+      const rows = await db.select({
+        uid: compositionTable.uid,
+        ehrId: compositionTable.ehrId,
+        templateId: compositionTable.templateId,
+        archetypeId: compositionTable.archetypeId,
+        composerName: compositionTable.composerName,
+        lifecycleState: compositionTable.lifecycleState,
+        timeCommitted: compositionTable.timeCommitted,
+        content: compositionTable.content,
+        firstName: patientProfile.firstName,
+        lastName: patientProfile.lastName,
+        ward: patientProfile.ward,
+      })
+        .from(compositionTable)
+        .leftJoin(patientProfile, eq(compositionTable.ehrId, patientProfile.ehrId))
+        .where(ehrId ? and(eq(compositionTable.ehrId, ehrId)) : undefined)
+        .orderBy(desc(compositionTable.timeCommitted))
+        .limit(limit)
+        .offset(offset)
+
+      return c.json({
+        results: rows.map((row) => {
+          const content = (row.content ?? {}) as Record<string, unknown>
+          const topName = content['name'] as { value?: string } | undefined
+          const contentItems = Array.isArray(content['content']) ? content['content'] as Array<Record<string, unknown>> : []
+          const firstItem = contentItems[0]
+          const firstItemData = (firstItem?.['data'] ?? {}) as Record<string, unknown>
+          const summaryText = typeof firstItemData['text'] === 'string'
+            ? firstItemData['text']
+            : topName?.value ?? row.templateId
+          return {
+            uid: row.uid,
+            ehrId: row.ehrId,
+            version: Number.parseInt(row.uid.split('::').at(-1) ?? '1', 10) || 1,
+            patientName: row.firstName && row.lastName ? `${row.firstName} ${row.lastName}` : row.ehrId,
+            ward: row.ward ?? 'Unknown',
+            type: topName?.value ?? row.templateId,
+            archetype: row.archetypeId ?? 'openEHR-EHR-COMPOSITION.unknown.v1',
+            template: row.templateId,
+            composer: row.composerName,
+            date: row.timeCommitted.toISOString().slice(0, 10),
+            status: row.lifecycleState,
+            summary: summaryText,
+          }
+        }),
+        limit,
+        offset,
+      })
+    } catch (e) { return handleError(e, c) }
+  })
 
   app.post('/v1/query/aql/assist', async (c) => {
     try {

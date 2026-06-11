@@ -15,6 +15,41 @@
       "when": 1781142243697,
       "tag": "0001_wooden_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781148243697,
+      "tag": "0002_patient_profile_relational",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781150243697,
+      "tag": "0003_gl_audit_prescriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781151243697,
+      "tag": "0004_schema_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781161243697,
+      "tag": "0005_ai_imaging_module",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781164243697,
+      "tag": "0006_ai_imaging_image_data",
+      "breakpoints": true
     }
   ]
 }

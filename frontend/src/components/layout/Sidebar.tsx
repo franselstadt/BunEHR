@@ -21,6 +21,8 @@ import {
   Pets as PetsIcon,
   AttachMoney as FinanceIcon,
   MedicalInformation as Icd10Icon,
+  Source as CkmIcon,
+  Biotech as ImagingIcon,
 } from '@mui/icons-material'
 
 export const DRAWER_WIDTH = 220
@@ -39,12 +41,14 @@ const NAV_SECTIONS = [
       { label: 'Patients',        icon: <PeopleIcon />,   path: '/patients',  desc: 'Search & manage patient records' },
       { label: 'Clinical Records', icon: <ArticleIcon />,  path: '/records',   desc: 'View & create clinical compositions' },
       { label: 'Finance & Billing', icon: <FinanceIcon />, path: '/finance',   desc: 'ICD-10, CPT codes, Medicare & billing' },
+      { label: 'AI Imaging', icon: <ImagingIcon />, path: '/ai-imaging', desc: 'Ziehl-Neelsen + CT AI analyzer results' },
     ],
   },
   {
     heading: 'Data & Queries',
     items: [
       { label: 'AQL Query',    icon: <SearchIcon />,    path: '/aql',       desc: 'Run OpenEHR archetype queries' },
+      { label: 'CKM Mirror',   icon: <CkmIcon />,       path: '/ckm',       desc: 'Browse CKM archetypes and templates' },
       { label: 'OpenEHR',      icon: <ScienceIcon />,   path: '/openehr',   desc: 'Explore the OpenEHR data model' },
     ],
   },

@@ -49,6 +49,8 @@ export function createPatientsController(patients: IPatientService) {
 
   app.get('/:ehrId/vitals', async (c) => {
     try {
+      const patient = await patients.getById(c.req.param('ehrId'))
+      if (!patient) return c.json({ detail: `Patient not found: ${c.req.param('ehrId')}` }, 404)
       return c.json(await patients.getVitalTrend(c.req.param('ehrId')))
     } catch (e) {
       return handleError(e, c)

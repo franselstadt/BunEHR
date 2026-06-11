@@ -13,9 +13,9 @@
  */
 import type { Patient, VitalTrend } from '../types/openehr.ts'
 
-/** Centre of a typical city hospital campus (demo coordinates) */
-const HOSPITAL_LAT = 51.5074
-const HOSPITAL_LNG = -0.1278
+/** Center of the San Francisco demo hospital campus. */
+const HOSPITAL_LAT = 37.7749
+const HOSPITAL_LNG = -122.4194
 
 /** Offset coordinates to simulate ward locations within the hospital */
 const offset = (dLat: number, dLng: number) => ({

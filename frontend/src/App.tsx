@@ -6,6 +6,8 @@ import DashboardPage       from './pages/DashboardPage.tsx'
 import PatientsPage        from './pages/PatientsPage.tsx'
 import PatientDetailPage   from './pages/PatientDetailPage.tsx'
 import OpenEHRPage         from './pages/OpenEHRPage.tsx'
+import CkmPage             from './pages/CkmPage.tsx'
+import ImagingAiPage       from './pages/ImagingAiPage.tsx'
 import AboutPage           from './pages/AboutPage.tsx'
 import ClinicalRecordsPage from './pages/ClinicalRecordsPage.tsx'
 import FinancePage         from './pages/FinancePage.tsx'
@@ -31,7 +33,9 @@ export default function App() {
             <Route path="patients/:ehrId" element={<PatientDetailPage />} />
             <Route path="records"      element={<ClinicalRecordsPage />} />
             <Route path="finance"      element={<FinancePage />} />
+            <Route path="ai-imaging"   element={<ImagingAiPage />} />
             <Route path="aql"          element={<OpenEHRPage />} />
+            <Route path="ckm"          element={<CkmPage />} />
             <Route path="openehr"      element={<OpenEHRPage />} />
             <Route path="settings"     element={<OpenEHRPage />} />
             <Route path="about"        element={<AboutPage />} />

@@ -8,6 +8,7 @@
  *  - Live activity feed powered by WebSockets
  *  - Quick patient status breakdown
  */
+import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   Grid, Card, CardContent, Typography, Box, Chip, LinearProgress,
@@ -26,31 +27,30 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
   BarChart, Bar, Legend,
 } from 'recharts'
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet'
+import { MapContainer, TileLayer, Popup, CircleMarker } from 'react-leaflet'
 import { useNavigate } from 'react-router-dom'
-import { SAMPLE_PATIENTS } from '../api/samplePatients.ts'
+import { getPatients } from '../api/ehrClient.ts'
 import { statusColors, wardColors } from '../theme/medblocksTheme.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
-import type { LiveEvent } from '../types/openehr.ts'
+import type { LiveEvent, Patient } from '../types/openehr.ts'
 
-// ── Admission trend data (last 7 days, simulated) ────────────────────────────
-const ADMISSION_TREND = [
-  { day: 'Mon', admissions: 8, discharges: 5 },
-  { day: 'Tue', admissions: 12, discharges: 9 },
-  { day: 'Wed', admissions: 7, discharges: 11 },
-  { day: 'Thu', admissions: 15, discharges: 8 },
-  { day: 'Fri', admissions: 10, discharges: 13 },
-  { day: 'Sat', admissions: 6,  discharges: 7 },
-  { day: 'Sun', admissions: 9,  discharges: 6 },
-]
+const toIsoDate = (date: Date) => date.toISOString().slice(0, 10)
+const DAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// ── Derived stats ─────────────────────────────────────────────────────────────
-const totalPatients  = SAMPLE_PATIENTS.length
-const criticalCount  = SAMPLE_PATIENTS.filter(p => p.status === 'CRITICAL').length
-const todayAdmitted  = SAMPLE_PATIENTS.filter(p => p.admittedDate === '2026-06-10').length
-const wardBreakdown  = Object.entries(
-  SAMPLE_PATIENTS.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.ward]: (acc[p.ward] ?? 0) + 1 }), {})
-).sort((a, b) => b[1] - a[1])
+const buildAdmissionTrend = (patients: Patient[]) => {
+  const days = [...Array(7)].map((_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
+    const key = toIsoDate(d)
+    return {
+      key,
+      day: DAY_LABEL[d.getDay()]!,
+      admissions: patients.filter((p) => p.admittedDate === key).length,
+      discharges: patients.filter((p) => p.status === 'DISCHARGED' && p.admittedDate === key).length,
+    }
+  })
+  return days
+}
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
@@ -89,6 +89,23 @@ const severityColor = { info: '#3B82F6', warning: '#F59E0B', error: '#EF4444', s
 export default function DashboardPage() {
   const { events, wsConnected } = useOutletContext<{ events: LiveEvent[]; wsConnected: boolean }>()
   const navigate = useNavigate()
+  const [patients, setPatients] = useState<Patient[]>([])
+
+  useEffect(() => {
+    getPatients().then(setPatients).catch(() => setPatients([]))
+  }, [])
+
+  const totalPatients = patients.length
+  const criticalCount = patients.filter((p) => p.status === 'CRITICAL').length
+  const todayAdmitted = patients.filter((p) => p.admittedDate === toIsoDate(new Date())).length
+  const wardBreakdown = useMemo(() => Object.entries(
+    patients.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.ward]: (acc[p.ward] ?? 0) + 1 }), {}),
+  ).sort((a, b) => b[1] - a[1]), [patients])
+  const admissionTrend = useMemo(() => buildAdmissionTrend(patients), [patients])
+  const highAcuityPatients = useMemo(
+    () => patients.filter((p) => ['CRITICAL', 'OBSERVATION'].includes(p.status)),
+    [patients],
+  )
 
   return (
     <Box>
@@ -149,7 +166,7 @@ export default function DashboardPage() {
             {/* Leaflet map — rendered at fixed height */}
             <Box sx={{ height: 340, '& .leaflet-container': { borderRadius: '0 0 10px 10px' } }}>
               <MapContainer
-                center={[51.5074, -0.1278]}
+                center={[37.7749, -122.4194]}
                 zoom={16}
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={false}
@@ -158,7 +175,7 @@ export default function DashboardPage() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {SAMPLE_PATIENTS.map(patient => {
+                {patients.map(patient => {
                   const color = wardColors[patient.ward as keyof typeof wardColors] ?? '#3B82F6'
                   const isCritical = patient.status === 'CRITICAL'
                   return (
@@ -219,7 +236,7 @@ export default function DashboardPage() {
                     </Box>
                     <LinearProgress
                       variant="determinate"
-                      value={(count / totalPatients) * 100}
+                      value={totalPatients > 0 ? (count / totalPatients) * 100 : 0}
                       sx={{ bgcolor: `${color}18`, '& .MuiLinearProgress-bar': { bgcolor: color } }}
                     />
                   </Box>
@@ -238,7 +255,7 @@ export default function DashboardPage() {
                 Track patient flow over the past week to spot trends and plan capacity
               </Typography>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={ADMISSION_TREND}>
+                <BarChart data={admissionTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
@@ -302,7 +319,7 @@ export default function DashboardPage() {
                 </Box>
                 <Button size="small" variant="text" onClick={() => navigate('/patients')}>View all patients →</Button>
               </Box>
-              {SAMPLE_PATIENTS.filter(p => ['CRITICAL', 'OBSERVATION'].includes(p.status)).map((p, i) => (
+              {highAcuityPatients.map((p, i) => (
                 <Box key={p.ehrId}>
                   {i > 0 && <Divider sx={{ my: 1 }} />}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -349,7 +366,7 @@ export default function DashboardPage() {
           "Orange/amber status means the patient is under observation — not yet critical but being monitored.",
         ]}
         developerTips={[
-          "GET /api/patients — returns 12 sample patients. Run POST /api/seed first to create their EHRs in PostgreSQL.",
+          "GET /api/patients — dashboard cards and map now render directly from normalized PostgreSQL patient_profile and patient_vital tables.",
           "WS /ws — connect with any WebSocket client. Events are JSON: { type, patientId, patientName, ward, message, severity, timestamp }",
           "The demo event stream fires every 8 seconds. In production, replace startDemoEventStream() with real hospital system integrations.",
           "AQL query for all EHRs: POST /v1/query/aql with { q: 'SELECT e/ehr_id/value FROM EHR e' }",

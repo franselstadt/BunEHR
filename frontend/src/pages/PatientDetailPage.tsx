@@ -23,8 +23,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts'
-import { SAMPLE_PATIENTS, generateVitalTrend } from '../api/samplePatients.ts'
-import { getPatient } from '../api/ehrClient.ts'
+import { getPatient, getVitalTrend } from '../api/ehrClient.ts'
 import type { Patient } from '../types/openehr.ts'
 import { statusColors, wardColors } from '../theme/medblocksTheme.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
@@ -78,14 +77,21 @@ export default function PatientDetailPage() {
   const navigate   = useNavigate()
   const [tab, setTab] = useState(0)
   const [patient, setPatient] = useState<Patient | null>(null)
+  const [vitalTrend, setVitalTrend] = useState<Array<{ time: string; systolic: number; diastolic: number; heartRate: number; spo2: number; temp: number }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!ehrId) return
     setLoading(true)
-    getPatient(ehrId)
-      .then(setPatient)
-      .catch(() => setPatient(SAMPLE_PATIENTS.find(p => p.ehrId === ehrId) ?? null))
+    Promise.all([getPatient(ehrId), getVitalTrend(ehrId)])
+      .then(([patientRow, trend]) => {
+        setPatient(patientRow)
+        setVitalTrend(trend)
+      })
+      .catch(() => {
+        setPatient(null)
+        setVitalTrend([])
+      })
       .finally(() => setLoading(false))
   }, [ehrId])
 
@@ -102,7 +108,6 @@ export default function PatientDetailPage() {
     )
   }
 
-  const vitalTrend   = generateVitalTrend(patient)
   const compositions = makeMockCompositions(`${patient.firstName} ${patient.lastName}`)
   const wardColor    = wardColors[patient.ward as keyof typeof wardColors] ?? '#3B82F6'
   const v = patient.vitals!

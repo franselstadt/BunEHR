@@ -37,6 +37,7 @@ Data stored in BunEHR is interoperable with any other openEHR v1-compliant syste
 | **Hospital map** | Interactive Leaflet map with patient ward locations |
 | **Vital sign charts** | 24-hour trending with clinical normal range reference lines |
 | **DDD architecture** | Domain-driven design — clinical rules isolated from infrastructure |
+| **AI Imaging module (idea in progress)** | Ziehl-Neelsen stain + CT pseudo-analysis with GE microscope/CT demo feeds, saved back into EHR compositions |
 | **Demo by Frans Elstadt** | Dedicated to Daisy 🐾 — Miniature Schnauzer, South Africa |
 
 ---
@@ -248,6 +249,35 @@ PUT    /v1/query/stored-queries/{name}/{v}  Save named query
 
 # WebSocket
 WS     /ws                                  Live clinical event feed
+```
+
+---
+
+## AI Imaging Module (Idea In Progress)
+
+An in-progress module now exists for tuberculosis-focused imaging triage workflows.
+
+- **Ziehl-Neelsen analyzer** (`POST /api/ai/ziehl-neelsen/analyze`)
+  - Accepts demo asset IDs or image URIs.
+  - Generates pseudo AI outputs: dye map grid, acid-fast bacilli count, bacillary load band, confidence.
+  - Mimics **GE microscope** integration via pseudo device metadata.
+- **CT scan analyzer** (`POST /api/ai/ct-scan/analyze`)
+  - Computes pseudo lesion map, nodule count, consolidation %, TB suspicion score, confidence, impression.
+  - Mimics **GE CT** integration metadata for demo workflows.
+- **Demo imaging assets in PostgreSQL** (`POST /api/ai/seed-imaging-demo`, `GET /api/ai/demo-images`)
+  - Demo image metadata and dye maps are persisted in normalized tables, not in-memory arrays.
+- **Results pushed into openEHR compositions**
+  - Each analysis automatically creates a new composition in the patient EHR.
+  - CT composition payload links the latest Ziehl-Neelsen result when present.
+
+### New AI imaging endpoints
+
+```http
+POST /api/ai/seed-imaging-demo               Seed demo GE pseudo imaging assets
+GET  /api/ai/demo-images                     List demo images and dye maps
+POST /api/ai/ziehl-neelsen/analyze           Analyze stain image and write result to EHR
+POST /api/ai/ct-scan/analyze                 Analyze CT scan and write result to EHR
+GET  /api/ai/results/{ehr_id}                Read combined AI analysis history for an EHR
 ```
 
 ---

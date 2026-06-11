@@ -77,6 +77,16 @@ const PRESET_QUERIES = [
     q: 'SELECT e/ehr_id/value, e/time_created/value FROM EHR e ORDER BY e/time_created DESC',
   },
   {
+    label: 'Patient Names + Ward',
+    description: 'List EHR ID with patient first name, last name, ward and status',
+    q: 'SELECT e/ehr_id/value, p/first_name, p/last_name, p/ward, p/status FROM EHR e CONTAINS PATIENT_PROFILE p',
+  },
+  {
+    label: 'ICU Patient Names',
+    description: 'Filter patient names to ICU ward',
+    q: "SELECT e/ehr_id/value, p/first_name, p/last_name, p/ward, p/status FROM EHR e CONTAINS PATIENT_PROFILE p WHERE p/ward = 'ICU'",
+  },
+  {
     label: 'All Compositions',
     description: 'Show every clinical document across all patients',
     q: 'SELECT e/ehr_id/value, c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c',
@@ -238,6 +248,9 @@ export default function OpenEHRPage() {
                     <strong>AQL tip:</strong> Think of it like SQL but for clinical data.
                     <code style={{ display: 'block', marginTop: 4, fontSize: '0.7rem' }}>
                       SELECT … FROM EHR e CONTAINS COMPOSITION c
+                    </code>
+                    <code style={{ display: 'block', marginTop: 4, fontSize: '0.7rem' }}>
+                      SELECT … FROM EHR e CONTAINS PATIENT_PROFILE p
                     </code>
                   </Typography>
                 </Alert>

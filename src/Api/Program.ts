@@ -10,8 +10,11 @@ import { createOpenEhrController } from './Controllers/OpenEhrController.ts'
 import { createPatientsController } from './Controllers/PatientsController.ts'
 import { createClinicalFinanceController } from './Controllers/ClinicalFinanceController.ts'
 import { createConformanceController } from './Controllers/ConformanceController.ts'
+import { createCkmController } from './Controllers/CkmController.ts'
+import { createImagingAiController } from './Controllers/ImagingAiController.ts'
 import { deepSnakeCase } from './Middleware/JsonNamingMiddleware.ts'
 import { openApiSpec } from './OpenApiSpec.ts'
+import { broadcast } from './WebSockets/ClinicalEventHub.ts'
 
 export function buildApp(): Hono {
   const app = new Hono()
@@ -56,7 +59,24 @@ export function buildApp(): Hono {
 
   app.route('/', createOpenEhrController(services))
   app.route('/', createConformanceController())
+  app.post('/api/seed', async (c) => {
+    const count = await services.patients.seedSampleEhRs((patient) => {
+      broadcast({
+        id: crypto.randomUUID(),
+        type: 'admission',
+        patientId: patient.ehrId,
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        ward: patient.ward,
+        message: `Seed: EHR created for ${patient.firstName} ${patient.lastName}`,
+        severity: 'info',
+        timestamp: new Date().toISOString(),
+      })
+    })
+    return c.json({ message: `Seeded ${count} patient EHRs`, count })
+  })
   app.route('/api/patients', createPatientsController(services.patients))
+  app.route('/api/ai', createImagingAiController(services))
+  app.route('/', createCkmController())
   app.route('/v1', createClinicalFinanceController())
   app.route('/api', createClinicalFinanceController())
 

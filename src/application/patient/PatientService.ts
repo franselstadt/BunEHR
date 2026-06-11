@@ -6,7 +6,7 @@ import type { PatientDto, VitalTrendPoint } from './models/PatientDto.ts'
 import type { IPatientRepository } from '../../domain/patient/repositories/IPatientRepository.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
 
-const defaultLocation = () => ({ lat: 51.5074, lng: -0.1278 })
+const defaultLocation = () => ({ lat: 37.7749, lng: -122.4194 })
 
 export class PatientService implements IPatientService {
   constructor(

@@ -12,7 +12,7 @@
  *
  * Made by Frans Elstadt in San Francisco.
  */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box, Grid, Card, CardContent, Typography, Button, Chip, Stack,
@@ -27,41 +27,25 @@ import {
   Visibility as ViewIcon, ContentCopy as CopyIcon, CheckCircle as DoneIcon,
   Close as CloseIcon, Send as SendIcon,
 } from '@mui/icons-material'
-import { SAMPLE_PATIENTS } from '../api/samplePatients.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
 import { Icd10Lookup } from '../components/shared/Icd10Lookup.tsx'
+import { getPatients } from '../api/ehrClient.ts'
+import type { Patient } from '../types/openehr.ts'
 
-// ── Sample compositions (from EHR seed data) ──────────────────────────────────
-const SAMPLE_COMPOSITIONS = SAMPLE_PATIENTS.flatMap((p, idx) => [
-  {
-    uid: `comp-${p.ehrId}-001::local.bunehr.com::1`,
-    ehrId: p.ehrId,
-    patientName: `${p.firstName} ${p.lastName}`,
-    type: 'Encounter Note',
-    archetype: 'openEHR-EHR-COMPOSITION.encounter.v1',
-    template: 'BunEHR-Encounter.v1',
-    composer: p.primaryClinician,
-    date: p.admittedDate,
-    ward: p.ward,
-    version: 1,
-    status: 'COMPLETE',
-    summary: `Initial assessment: ${p.primaryDiagnosis}`,
-  },
-  ...(idx % 3 === 0 ? [{
-    uid: `comp-${p.ehrId}-002::local.bunehr.com::1`,
-    ehrId: p.ehrId,
-    patientName: `${p.firstName} ${p.lastName}`,
-    type: 'Blood Pressure Observation',
-    archetype: 'openEHR-EHR-OBSERVATION.blood_pressure.v2',
-    template: 'BunEHR-Vitals.v1',
-    composer: 'Nursing Staff',
-    date: '2026-06-10',
-    ward: p.ward,
-    version: 1,
-    status: 'COMPLETE',
-    summary: p.vitals ? `BP ${p.vitals.bloodPressureSystolic}/${p.vitals.bloodPressureDiastolic} mmHg` : 'Routine vitals',
-  }] : []),
-]).slice(0, 30)
+interface CompositionListRow {
+  uid: string
+  ehrId: string
+  version: number
+  patientName: string
+  type: string
+  archetype: string
+  template: string
+  composer: string
+  date: string
+  ward: string
+  status: string
+  summary: string
+}
 
 const COMPOSITION_TYPES = [
   { label: 'Encounter Note',          archetype: 'openEHR-EHR-COMPOSITION.encounter.v1',     template: 'BunEHR-Encounter.v1' },
@@ -85,10 +69,12 @@ const SETTINGS_CODES = [
 
 export default function ClinicalRecordsPage() {
   const navigate   = useNavigate()
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [compositions, setCompositions] = useState<CompositionListRow[]>([])
   const [search,   setSearch]   = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [viewComp,   setViewComp]   = useState<typeof SAMPLE_COMPOSITIONS[0] | null>(null)
+  const [viewComp,   setViewComp]   = useState<CompositionListRow | null>(null)
   const [icd10Open, setIcd10Open] = useState(false)
   const [posting,   setPosting]   = useState(false)
   const [posted,    setPosted]    = useState(false)
@@ -97,7 +83,7 @@ export default function ClinicalRecordsPage() {
 
   // ── New composition form state ────────────────────────────────────────
   const [form, setForm] = useState({
-    ehrId: SAMPLE_PATIENTS[0]?.ehrId ?? '',
+    ehrId: '',
     compositionType: COMPOSITION_TYPES[0]!,
     composerName: 'Dr. Admin',
     setting: '228',
@@ -107,13 +93,30 @@ export default function ClinicalRecordsPage() {
     icd10Desc: '',
   })
 
-  const filtered = SAMPLE_COMPOSITIONS.filter(c => {
+  useEffect(() => {
+    Promise.all([
+      getPatients().catch(() => []),
+      fetch('/api/compositions?limit=500').then((r) => r.ok ? r.json() : { results: [] }),
+    ]).then(([patientRows, compositionRows]) => {
+      const patientList = patientRows as Patient[]
+      setPatients(patientList)
+      if (!form.ehrId && patientList[0]) {
+        setForm((prev) => ({ ...prev, ehrId: patientList[0]!.ehrId }))
+      }
+      setCompositions(((compositionRows as { results?: CompositionListRow[] }).results) ?? [])
+    }).catch(() => {
+      setPatients([])
+      setCompositions([])
+    })
+  }, [])
+
+  const filtered = useMemo(() => compositions.filter(c => {
     const q = search.toLowerCase()
     return (
       (!search || c.patientName.toLowerCase().includes(q) || c.type.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q)) &&
       (!typeFilter || c.type === typeFilter)
     )
-  })
+  }), [compositions, search, typeFilter])
 
   const handlePost = async () => {
     setPosting(true); setPostError('')
@@ -140,7 +143,12 @@ export default function ClinicalRecordsPage() {
           content: form.notes ? [{ archetype_node_id: 'at0001', name: { value: 'Clinical note' }, data: { text: form.notes, icd10_code: form.icd10Code, icd10_description: form.icd10Desc } }] : [],
         }),
       })
-      if (res.ok) { setPosted(true); setStep(2) }
+      if (res.ok) {
+        const rows = await fetch('/api/compositions?limit=500').then((r) => r.ok ? r.json() : { results: [] }) as { results?: CompositionListRow[] }
+        setCompositions(rows.results ?? [])
+        setPosted(true)
+        setStep(2)
+      }
       else { const e = await res.json() as { detail?: string }; setPostError(e.detail ?? 'Failed to create composition') }
     } catch { setPostError('Network error — is the BunEHR API running?') }
     setPosting(false)
@@ -234,7 +242,7 @@ export default function ClinicalRecordsPage() {
         </Table>
       </TableContainer>
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-        Showing {filtered.length} of {SAMPLE_COMPOSITIONS.length} compositions · Run POST /api/seed for real openEHR compositions
+        Showing {filtered.length} of {compositions.length} compositions · Run POST /api/seed to load demo EHR data into PostgreSQL
       </Typography>
 
       {/* ── Create Composition Dialog ───────────────────────────────────── */}
@@ -261,7 +269,7 @@ export default function ClinicalRecordsPage() {
               <FormControl fullWidth>
                 <InputLabel>Patient (EHR)</InputLabel>
                 <Select value={form.ehrId} label="Patient (EHR)" onChange={e => setForm(f => ({ ...f, ehrId: e.target.value }))}>
-                  {SAMPLE_PATIENTS.map(p => <MenuItem key={p.ehrId} value={p.ehrId}>{p.firstName} {p.lastName} — {p.ward}</MenuItem>)}
+                  {patients.map(p => <MenuItem key={p.ehrId} value={p.ehrId}>{p.firstName} {p.lastName} — {p.ward}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControl fullWidth>
@@ -273,7 +281,7 @@ export default function ClinicalRecordsPage() {
                   </MenuItem>)}
                 </Select>
               </FormControl>
-              <Button variant="contained" onClick={() => setStep(1)}>Next →</Button>
+              <Button variant="contained" onClick={() => setStep(1)} disabled={!form.ehrId}>Next →</Button>
             </Stack>
           )}
 

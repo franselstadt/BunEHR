@@ -2,6 +2,8 @@ import {
   pgTable, text, boolean, timestamp, jsonb, index, uniqueIndex,
   numeric,
   integer,
+  date,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 
 // ── EHR ──────────────────────────────────────────────────────────────────────
@@ -213,12 +215,12 @@ export const patientProfile = pgTable('patient_profile', {
   subjectId:         text('subject_id').notNull(),
   firstName:         text('first_name').notNull(),
   lastName:          text('last_name').notNull(),
-  dateOfBirth:       text('date_of_birth').notNull(),
+  dateOfBirth:       date('date_of_birth').notNull(),
   gender:            text('gender').notNull(),
   bloodType:         text('blood_type').notNull(),
   ward:              text('ward').notNull(),
   room:              text('room').notNull(),
-  admittedDate:      text('admitted_date').notNull(),
+  admittedDate:      date('admitted_date').notNull(),
   status:            text('status').notNull(),
   primaryDiagnosis:  text('primary_diagnosis').notNull(),
   primaryClinician:  text('primary_clinician').notNull(),
@@ -255,7 +257,7 @@ export const glAccount = pgTable('gl_account', {
   code:      text('code').notNull().unique(),
   name:      text('name').notNull(),
   type:      text('type').notNull(), // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
-  parentId:  text('parent_id'),
+  parentId:  text('parent_id').references((): AnyPgColumn => glAccount.id),
   isActive:  boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -345,6 +347,68 @@ export const prescriptionFill = pgTable('prescription_fill', {
   index('idx_prescription_fill_date').on(t.filledAt),
 ])
 
+// ── AI IMAGING ANALYSIS ────────────────────────────────────────────────────────
+
+export const imagingDemoAsset = pgTable('imaging_demo_asset', {
+  id:             text('id').primaryKey(),
+  modality:       text('modality').notNull(), // ZIEHL_NEELSEN | CT_SCAN
+  sourceVendor:   text('source_vendor').notNull(),
+  sourceModel:    text('source_model').notNull(),
+  imageUri:       text('image_uri').notNull(),
+  imageData:      text('image_data').notNull(),
+  dyeMap:         jsonb('dye_map'),
+  bacteriaCount:  integer('bacteria_count'),
+  notes:          text('notes'),
+  capturedAt:     timestamp('captured_at', { withTimezone: true }),
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_imaging_demo_asset_modality').on(t.modality),
+])
+
+export const ziehlNeelsenAnalysis = pgTable('ziehl_neelsen_analysis', {
+  id:               text('id').primaryKey(),
+  ehrId:            text('ehr_id').notNull().references(() => ehr.id, { onDelete: 'cascade' }),
+  demoAssetId:      text('demo_asset_id').references(() => imagingDemoAsset.id),
+  sourceVendor:     text('source_vendor').notNull(),
+  sourceModel:      text('source_model').notNull(),
+  imageUri:         text('image_uri').notNull(),
+  analyzedImageData: text('analyzed_image_data').notNull(),
+  dyeMap:           jsonb('dye_map').notNull(),
+  bacteriaCount:    integer('bacteria_count').notNull(),
+  acidFastScore:    numeric('acid_fast_score', { precision: 5, scale: 2 }).notNull(),
+  bacillaryLoadBand: text('bacillary_load_band').notNull(), // NEGATIVE | SCANTY | 1+ | 2+ | 3+
+  aiConfidence:     numeric('ai_confidence', { precision: 5, scale: 2 }).notNull(),
+  interpretation:   text('interpretation').notNull(),
+  analyzedAt:       timestamp('analyzed_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_zn_analysis_ehr').on(t.ehrId),
+  index('idx_zn_analysis_analyzed_at').on(t.analyzedAt),
+])
+
+export const ctScanAnalysis = pgTable('ct_scan_analysis', {
+  id:                  text('id').primaryKey(),
+  ehrId:               text('ehr_id').notNull().references(() => ehr.id, { onDelete: 'cascade' }),
+  studyUid:            text('study_uid').notNull(),
+  imageUri:            text('image_uri').notNull(),
+  analyzedImageData:   text('analyzed_image_data').notNull(),
+  sourceVendor:        text('source_vendor').notNull(),
+  sourceModel:         text('source_model').notNull(),
+  lesionMap:           jsonb('lesion_map').notNull(),
+  cavityPresent:       boolean('cavity_present').notNull().default(false),
+  pleuralEffusion:     boolean('pleural_effusion').notNull().default(false),
+  noduleCount:         integer('nodule_count').notNull(),
+  consolidationPercent: numeric('consolidation_percent', { precision: 5, scale: 2 }).notNull(),
+  tbSuspicionScore:    numeric('tb_suspicion_score', { precision: 5, scale: 2 }).notNull(),
+  aiConfidence:        numeric('ai_confidence', { precision: 5, scale: 2 }).notNull(),
+  impression:          text('impression').notNull(),
+  analyzedAt:          timestamp('analyzed_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('idx_ct_analysis_ehr').on(t.ehrId),
+  index('idx_ct_analysis_study_uid').on(t.studyUid),
+])
+
 // ── Inferred types ────────────────────────────────────────────────────────────
 
 export type EhrRow                  = typeof ehr.$inferSelect
@@ -363,3 +427,6 @@ export type GlJournalLineRow        = typeof glJournalLine.$inferSelect
 export type AuditEventRow           = typeof auditEvent.$inferSelect
 export type PrescriptionRow         = typeof prescription.$inferSelect
 export type PrescriptionFillRow     = typeof prescriptionFill.$inferSelect
+export type ImagingDemoAssetRow     = typeof imagingDemoAsset.$inferSelect
+export type ZiehlNeelsenAnalysisRow = typeof ziehlNeelsenAnalysis.$inferSelect
+export type CtScanAnalysisRow       = typeof ctScanAnalysis.$inferSelect

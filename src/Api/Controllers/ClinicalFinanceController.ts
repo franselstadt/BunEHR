@@ -586,6 +586,23 @@ export function createClinicalFinanceController() {
   // ── Medicare Eligibility ───────────────────────────────────────────────────
 
   /**
+   * GET /v1/medicare
+   * List Medicare eligibility rows with optional status filter.
+   */
+  app.get('/medicare', async (c) => {
+    const status = c.req.query('status')
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '200', 10), 500)
+    const offset = parseInt(c.req.query('offset') ?? '0', 10)
+
+    const rows = await db.select().from(medicareEligibility)
+      .where(status ? eq(medicareEligibility.status, status) : undefined)
+      .orderBy(desc(medicareEligibility.verifiedAt))
+      .limit(limit)
+      .offset(offset)
+    return c.json({ results: rows, limit, offset })
+  })
+
+  /**
    * GET /v1/medicare/:ehr_id
    * Get Medicare eligibility status for a patient.
    */

@@ -13,7 +13,7 @@ export interface SamplePatient {
   allergies: string[]; location: { lat: number; lng: number }; vitals?: VitalSigns
 }
 
-const o = (dLat: number, dLng: number) => ({ lat: 51.5074 + dLat, lng: -0.1278 + dLng })
+const o = (dLat: number, dLng: number) => ({ lat: 37.7749 + dLat, lng: -122.4194 + dLng })
 
 export const SAMPLE_PATIENTS: SamplePatient[] = [
   { ehrId: 'ehr-001', subjectId: 'sub-001', firstName: 'Margaret', lastName: 'Chen', dateOfBirth: '1954-03-12', gender: 'female', bloodType: 'A+', ward: 'Cardiology', room: 'C-204', admittedDate: '2026-06-08', status: 'ADMITTED', primaryDiagnosis: 'Congestive Heart Failure (I50.0)', primaryClinician: 'Dr. Sarah Mitchell', allergies: ['Penicillin', 'Aspirin'], location: o(0.002, 0.003), vitals: { bloodPressureSystolic: 145, bloodPressureDiastolic: 92, heartRate: 88, temperature: 37.1, oxygenSat: 96, respiratoryRate: 18, recordedAt: '2026-06-10T09:00:00Z' } },

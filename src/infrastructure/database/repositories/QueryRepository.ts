@@ -1,6 +1,6 @@
 import { eq, like } from 'drizzle-orm'
 import type { Db } from '../client.ts'
-import { composition, ehr, storedQuery, templateDefinition } from '../schema.ts'
+import { composition, ehr, patientProfile, storedQuery, templateDefinition } from '../schema.ts'
 import type { IQueryRepository } from '../../../domain/query/repositories/IQueryRepository.ts'
 import type { IDefinitionRepository } from '../../../domain/query/repositories/IDefinitionRepository.ts'
 import type { AqlQueryResult } from '../../../domain/query/models/AqlQueryResult.ts'
@@ -16,6 +16,37 @@ export class QueryRepository implements IQueryRepository {
 
   async executeAql(q: string, offset = 0, fetch = 20, _params?: Record<string, unknown>): Promise<AqlQueryResult> {
     const upper = q.toUpperCase()
+
+    if (upper.includes('FIRST_NAME') || upper.includes('LAST_NAME') || upper.includes('PATIENT_PROFILE')) {
+      const wardMatch = /P\/WARD\s*=\s*'([^']+)'/i.exec(q)
+      const statusMatch = /P\/STATUS\s*=\s*'([^']+)'/i.exec(q)
+      const ward = wardMatch?.[1]
+      const status = statusMatch?.[1]
+      const rowsRaw = await this.db.select({
+        ehrId: patientProfile.ehrId,
+        firstName: patientProfile.firstName,
+        lastName: patientProfile.lastName,
+        ward: patientProfile.ward,
+        status: patientProfile.status,
+        admittedDate: patientProfile.admittedDate,
+      }).from(patientProfile).limit(Math.min(fetch, 500)).offset(offset)
+      const rows = rowsRaw.filter((r) =>
+        (!ward || r.ward === ward) && (!status || r.status === status),
+      )
+      return {
+        meta: { generator: 'BunEHR/1.0.0', executedAql: q, created: new Date().toISOString() },
+        q,
+        columns: [
+          { name: 'e/ehr_id/value', path: '/ehr_id/value' },
+          { name: 'p/first_name', path: '/patient_profile/first_name' },
+          { name: 'p/last_name', path: '/patient_profile/last_name' },
+          { name: 'p/ward', path: '/patient_profile/ward' },
+          { name: 'p/status', path: '/patient_profile/status' },
+          { name: 'p/admitted_date', path: '/patient_profile/admitted_date' },
+        ],
+        rows: rows.map(r => [r.ehrId, r.firstName, r.lastName, r.ward, r.status, r.admittedDate]),
+      }
+    }
 
     if (upper.includes('EHR') && upper.includes('COMPOSITION')) {
       const rows = await this.db.select({

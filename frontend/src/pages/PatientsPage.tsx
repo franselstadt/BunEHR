@@ -139,8 +139,7 @@ export default function PatientsPage() {
     try {
       setPatients(await getPatients())
     } catch {
-      const { SAMPLE_PATIENTS } = await import('../api/samplePatients.ts')
-      setPatients(SAMPLE_PATIENTS)
+      setPatients([])
     } finally {
       setLoading(false)
     }

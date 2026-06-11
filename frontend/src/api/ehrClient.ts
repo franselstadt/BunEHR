@@ -61,8 +61,8 @@ const toPatient = (raw: unknown): Patient => {
     primaryClinician: getField(obj, 'primaryClinician', 'primary_clinician', 'Dr. Admin'),
     allergies: getField(obj, 'allergies', 'allergies', [] as string[]),
     location: {
-      lat: getField(locationRaw ?? {}, 'lat', 'lat', 51.5074),
-      lng: getField(locationRaw ?? {}, 'lng', 'lng', -0.1278),
+      lat: getField(locationRaw ?? {}, 'lat', 'lat', 37.7749),
+      lng: getField(locationRaw ?? {}, 'lng', 'lng', -122.4194),
     },
     vitals: vitalsRaw ? {
       bloodPressureSystolic: getField(vitalsRaw, 'bloodPressureSystolic', 'blood_pressure_systolic', 120),
