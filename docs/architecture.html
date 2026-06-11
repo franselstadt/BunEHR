@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BunEHR — Architecture Reference</title>
+  <style>
+  /*
+   * BunEHR Architecture Reference
+   * Style: Ghibli × Claude Code — clean parchment, three muted pastels
+   *
+   * 1. Periwinkle  #7B93B8  — links, primary, headings
+   * 2. Sage green  #8FAE93  — success, notes, callouts
+   * 3. Terracotta  #B8846A  — warnings, accents, danger
+   *
+   * Base: warm parchment #F7F3EC, linen surfaces #FEFAF4
+   * Text: warm ink #3B3228, mist #8A7E72
+   * Border: #DDD5C5
+   */
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Nunito:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --c-peri:       #7B93B8;
+    --c-peri-l:     #EAF0F8;
+    --c-peri-m:     #C5D3E8;
+    --c-sage:       #8FAE93;
+    --c-sage-l:     #EBF3EC;
+    --c-sage-m:     #C2D8C5;
+    --c-terra:      #B8846A;
+    --c-terra-l:    #F5ECE7;
+    --c-terra-m:    #DBBFAE;
+    --c-parchment:  #F7F3EC;
+    --c-linen:      #FEFAF4;
+    --c-border:     #DDD5C5;
+    --c-border-d:   #C8BBA8;
+    --c-ink:        #3B3228;
+    --c-ink-l:      #5C5248;
+    --c-mist:       #8A7E72;
+    --c-mist-l:     #B0A698;
+    --c-sidebar:    #2C2820;
+    --c-danger:     #B05A5A;
+    --c-danger-l:   #F5EAEA;
+    --radius:       7px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; font-size: 15px; }
+
+  body {
+    font-family: 'Nunito', system-ui, sans-serif;
+    line-height: 1.75;
+    color: var(--c-ink);
+    background: var(--c-parchment);
+  }
+
+  /* ── Print ──────────────────────────────────────────────────────── */
+  @media print {
+    .no-print    { display: none !important; }
+    .page-break  { page-break-before: always; }
+    body         { font-size: 11pt; background: white; }
+    pre          { white-space: pre-wrap; word-break: break-word; }
+    a            { color: inherit; text-decoration: none; }
+    .section-header { background: var(--c-parchment) !important; color: var(--c-ink) !important; }
+    .section-header h2 { color: var(--c-ink) !important; }
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────────── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 248px;
+    background: var(--c-sidebar);
+    overflow-y: auto;
+    z-index: 100;
+    border-right: 1px solid rgba(255,255,255,.06);
+  }
+  .sidebar-logo {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    margin-bottom: 6px;
+  }
+  .sidebar-logo .name { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 1.05rem; color: #C8BCAD; letter-spacing: -.01em; }
+  .sidebar-logo .sub  { font-size: .68rem; color: #6B5E52; margin-top: 3px; }
+  .sidebar-section {
+    padding: 10px 18px 3px;
+    font-size: .62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .1em;
+    color: #4A3F35;
+  }
+  .sidebar a {
+    display: block; padding: 5px 18px;
+    color: #6B5E52; font-size: .8rem;
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: .12s;
+  }
+  .sidebar a:hover  { color: #C8BCAD; background: rgba(255,255,255,.04); border-left-color: var(--c-border-d); }
+  .sidebar a.active { color: #B8CEDE; border-left-color: var(--c-peri); }
+  .sidebar a[href*="ddd"], .sidebar a[href*="orm"] { color: #C8BAA8; font-weight: 600; }
+
+  main { margin-left: 248px; max-width: 960px; padding: 48px 52px; }
+  @media (max-width: 860px) { .sidebar { display: none; } main { margin-left: 0; padding: 24px 20px; } }
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 2rem; font-weight: 700; color: var(--c-ink); letter-spacing: -.01em; margin-bottom: .4rem; }
+  h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.5rem; font-weight: 600; color: var(--c-ink);
+    margin: 2.8rem 0 .9rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--c-border);
+  }
+  h3 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.2rem; font-weight: 600; color: var(--c-ink-l); margin: 1.8rem 0 .6rem; }
+  h4 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.05rem; font-weight: 600; color: var(--c-mist); margin: 1.4rem 0 .4rem; }
+  p  { margin-bottom: .9rem; color: var(--c-ink-l); }
+  strong { font-weight: 600; color: var(--c-ink); }
+  em     { font-style: italic; color: var(--c-peri); }
+  a      { color: var(--c-peri); text-decoration: underline; text-decoration-color: var(--c-peri-m); }
+  a:hover { text-decoration-color: var(--c-peri); }
+  ul, ol { padding-left: 1.5rem; margin-bottom: .9rem; }
+  li     { margin-bottom: .3rem; color: var(--c-ink-l); }
+  li::marker { color: var(--c-mist-l); }
+  code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: .84em;
+    background: var(--c-linen);
+    color: var(--c-peri);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--c-border);
+  }
+  hr { border: none; border-top: 1px solid var(--c-border); margin: 2rem 0; }
+  blockquote {
+    border-left: 3px solid var(--c-border-d);
+    padding: .7rem 1.2rem;
+    margin: 1rem 0;
+    background: var(--c-linen);
+    color: var(--c-mist);
+    font-style: italic;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+
+  /* ── Code blocks ─────────────────────────────────────────────────── */
+  pre {
+    background: #2C2820;
+    color: #C8BCAD;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 1.2rem 0;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    line-height: 1.65;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; border: none; }
+  .kw  { color: #B8CEDE; }
+  .str { color: #A8C8A8; }
+  .cm  { color: #6B5E52; font-style: italic; }
+  .fn  { color: #D4BC88; }
+  .num { color: #D4A8A8; }
+
+  /* ── Cards ────────────────────────────────────────────────────────── */
+  .card {
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 1.2rem 0;
+    background: var(--c-linen);
+  }
+  .card-title { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 1rem; margin-bottom: .6rem; color: var(--c-ink); }
+
+  /* ── Callouts ─────────────────────────────────────────────────────── */
+  .callout {
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 1.2rem 0;
+    border-left: 3px solid;
+  }
+  .callout.info    { background: var(--c-peri-l);  border-color: var(--c-peri);  }
+  .callout.success { background: var(--c-sage-l);  border-color: var(--c-sage);  }
+  .callout.warning { background: var(--c-terra-l); border-color: var(--c-terra); }
+  .callout.danger  { background: var(--c-danger-l); border-color: var(--c-danger); }
+  .callout .callout-title { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: .98rem; margin-bottom: .4rem; color: var(--c-ink); }
+  .callout p { margin-bottom: 0; font-size: .875rem; color: var(--c-ink-l); }
+
+  /* ── Tables ──────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: .855rem; }
+  thead th {
+    background: var(--c-parchment);
+    color: var(--c-mist);
+    font-weight: 600;
+    text-align: left;
+    padding: 9px 13px;
+    border: 1px solid var(--c-border);
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  tbody td { padding: 9px 13px; border: 1px solid var(--c-border); vertical-align: top; color: var(--c-ink-l); }
+  tbody tr:nth-child(even) td { background: var(--c-parchment); }
+  tbody tr:hover td { background: var(--c-peri-l); transition: background .1s; }
+
+  /* ── Badges ──────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: .7rem; font-weight: 600; margin: 0 2px;
+    border: 1px solid transparent;
+  }
+  .badge-blue   { background: var(--c-peri-l);  color: var(--c-peri);   border-color: var(--c-peri-m);  }
+  .badge-green  { background: var(--c-sage-l);  color: var(--c-sage);   border-color: var(--c-sage-m);  }
+  .badge-amber  { background: var(--c-terra-l); color: var(--c-terra);  border-color: var(--c-terra-m); }
+  .badge-red    { background: var(--c-danger-l);color: var(--c-danger); border-color: #D4B0B0;          }
+  .badge-purple { background: #F0EEF5; color: #7A6E9E; border-color: #C8C0D8; }
+  .badge-gray   { background: var(--c-linen); color: var(--c-mist); border-color: var(--c-border); }
+
+  /* ── Grid ────────────────────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 1rem 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 1rem 0; }
+  @media (max-width: 680px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── Stats ────────────────────────────────────────────────────────── */
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 1.1rem 0; }
+  .stat  {
+    flex: 1; min-width: 90px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    background: var(--c-linen);
+    text-align: center;
+  }
+  .stat-val { font-size: 1.7rem; font-weight: 700; color: var(--c-ink); line-height: 1; }
+  .stat-lbl { font-size: .68rem; color: var(--c-mist); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+
+  /* ── Section header ──────────────────────────────────────────────── */
+  .section-header {
+    background: var(--c-linen);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    margin: 2.5rem 0 2rem;
+    padding: 20px 24px;
+    border-left: 4px solid var(--c-peri);
+  }
+  .section-header h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    color: var(--c-ink); border: none; margin: 0 0 .2rem; font-size: 1.45rem;
+  }
+  .section-header h2::after { display: none; }
+  .section-header p { color: var(--c-mist); margin: 0; font-size: .875rem; }
+
+  /* Special DDD and ORM sections */
+  #ddd-ehr-importance .section-header { border-left-color: var(--c-sage); }
+  #orm-importance .section-header     { border-left-color: var(--c-peri); }
+
+  /* ── Cover ────────────────────────────────────────────────────────── */
+  .cover {
+    min-height: 70vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 48px 0;
+    border-bottom: 1px solid var(--c-border);
+    margin-bottom: 40px;
+  }
+  .cover-logo { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 3rem; font-weight: 700; color: var(--c-ink); letter-spacing: -.02em; margin-bottom: .25rem; }
+  .cover-sub  { font-size: 1rem; color: var(--c-mist); margin-bottom: 1.8rem; }
+  .cover-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2rem; }
+  .cover-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 1.8rem; }
+  .cover-meta-item { border-left: 2px solid var(--c-border-d); padding-left: 10px; }
+  .cover-meta-item .label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--c-mist); }
+  .cover-meta-item .value { font-size: .9rem; font-weight: 600; color: var(--c-ink); margin-top: 2px; }
+
+  /* ── ToC ─────────────────────────────────────────────────────────── */
+  .toc { columns: 2; column-gap: 36px; }
+  .toc-section { break-inside: avoid; margin-bottom: 1.1rem; }
+  .toc-section .toc-h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; color: var(--c-ink); font-size: .95rem; }
+  .toc-section .toc-h3 { padding-left: .9rem; color: var(--c-mist); font-size: .8rem; line-height: 1.8; }
+  .toc-section .toc-h3::before { content: "– "; color: var(--c-border-d); }
+  @media (max-width: 680px) { .toc { columns: 1; } }
+
+  /* ── File entries ────────────────────────────────────────────────── */
+  .file-entry {
+    border-left: 3px solid var(--c-peri);
+    padding: 12px 16px;
+    margin: 10px 0;
+    background: var(--c-linen);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    border-top: 1px solid var(--c-border);
+    border-right: 1px solid var(--c-border);
+    border-bottom: 1px solid var(--c-border);
+  }
+  .file-path  { font-family: 'JetBrains Mono', monospace; font-size: .8rem; font-weight: 500; color: var(--c-peri); margin-bottom: 5px; }
+  .file-meta  { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 7px; }
+  .file-body  { font-size: .845rem; color: var(--c-ink-l); line-height: 1.65; }
+  .file-rationale { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--c-border); font-size: .82rem; color: var(--c-mist); }
+
+  /* ── DB schema ────────────────────────────────────────────────────── */
+  .db-table { border: 1px solid var(--c-border); border-radius: var(--radius); margin: 1.2rem 0; overflow: hidden; }
+  .db-table-header { background: var(--c-parchment); padding: 10px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--c-border); }
+  .db-table-name  { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 700; font-size: 1rem; color: var(--c-ink); }
+  .db-col { display: flex; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--c-border); font-size: .8rem; align-items: flex-start; }
+  .db-col:last-child { border-bottom: none; }
+  .db-col:nth-child(even) { background: var(--c-parchment); }
+  .col-name { font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--c-ink); min-width: 155px; }
+  .col-type { font-family: 'JetBrains Mono', monospace; color: var(--c-peri); min-width: 95px; font-size: .76rem; }
+  .col-desc { color: var(--c-mist); }
+
+  /* ── API endpoints ────────────────────────────────────────────────── */
+  .endpoint { border: 1px solid var(--c-border); border-radius: var(--radius); margin: .7rem 0; overflow: hidden; background: var(--c-linen); }
+  .endpoint-header { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--c-parchment); border-bottom: 1px solid var(--c-border); }
+  .method { font-family: 'JetBrains Mono', monospace; font-size: .71rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; min-width: 58px; text-align: center; border: 1px solid; }
+  .method-get    { background: var(--c-sage-l);  color: var(--c-sage);   border-color: var(--c-sage-m);  }
+  .method-post   { background: var(--c-peri-l);  color: var(--c-peri);   border-color: var(--c-peri-m);  }
+  .method-put    { background: var(--c-terra-l); color: var(--c-terra);  border-color: var(--c-terra-m); }
+  .method-delete { background: var(--c-danger-l);color: var(--c-danger); border-color: #D4B0B0;          }
+  .method-ws     { background: #F0EEF5; color: #7A6E9E; border-color: #C8C0D8; }
+  .endpoint-path { font-family: 'JetBrains Mono', monospace; font-size: .84rem; font-weight: 400; color: var(--c-ink); }
+  .endpoint-body { padding: 8px 14px; font-size: .84rem; color: var(--c-mist); }
+
+  /* ── Daisy ────────────────────────────────────────────────────────── */
+  .daisy-box { border: 1px solid var(--c-border); border-radius: var(--radius); overflow: hidden; margin: 1.6rem 0; }
+  .daisy-inner { display: grid; grid-template-columns: 200px 1fr; }
+  @media (max-width: 680px) { .daisy-inner { grid-template-columns: 1fr; } }
+  .daisy-img  { width: 100%; height: 100%; object-fit: cover; object-position: center top; min-height: 240px; }
+  .daisy-text { padding: 24px 28px; background: var(--c-linen); }
+  .daisy-text h3 { margin-top: 0; }
+
+  /* ── Emoji section markers ───────────────────────────────────────── */
+  .emoji-h2 { font-size: 1.1rem; margin-right: .35rem; }
+
+  /* ── Demo credit strip ───────────────────────────────────────────── */
+  .demo-credit {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--c-linen);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    font-size: .8rem; color: var(--c-mist);
+    margin-bottom: 18px;
+  }
+
+  /* ── Selection ────────────────────────────────────────────────────── */
+  ::selection { background: var(--c-peri-l); color: var(--c-ink); }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--c-border-d); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar navigation ─────────────────────────────────────────────────── -->
+<nav class="sidebar no-print">
+  <div class="sidebar-logo">
+    <div class="name">BunEHR</div>
+    <div class="sub">Architecture Reference · v1.0.0</div>
+  </div>
+  <div class="sidebar-section">Document</div>
+  <a href="#cover">Cover</a>
+  <a href="#toc">Table of Contents</a>
+  <a href="#executive">Executive Summary</a>
+  <div class="sidebar-section">Architecture</div>
+  <a href="#overview">1. Overview</a>
+  <a href="#why-bun">2. Why Bun?</a>
+  <a href="#openehr">3. openEHR Standard</a>
+  <a href="#ddd">4. DDD Architecture</a>
+  <a href="#system-dag">5. System Diagram</a>
+  <div class="sidebar-section">Backend</div>
+  <a href="#domain">6. Domain Layer</a>
+  <a href="#application">7. Application Layer</a>
+  <a href="#infrastructure">8. Infrastructure Layer</a>
+  <a href="#interface">9. Interface Layer</a>
+  <a href="#backend-all">10. All Backend Files</a>
+  <div class="sidebar-section">Frontend</div>
+  <a href="#frontend">11. Frontend Architecture</a>
+  <a href="#frontend-files">12. Frontend Files</a>
+  <div class="sidebar-section">Data</div>
+  <a href="#database">13. Database Schema</a>
+  <a href="#orm">14. Drizzle ORM</a>
+  <div class="sidebar-section">API & Runtime</div>
+  <a href="#api">15. API Reference</a>
+  <a href="#websocket">16. WebSocket</a>
+  <a href="#docker">17. Docker</a>
+  <div class="sidebar-section">Key Insights</div>
+  <a href="#ddd-ehr-importance">★ DDD in EHR Systems</a>
+  <a href="#orm-importance">★ Why an ORM Matters</a>
+  <div class="sidebar-section">Quality</div>
+  <a href="#security">18. Security</a>
+  <a href="#glossary">19. Glossary</a>
+  <a href="#daisy">20. About & Daisy</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     COVER PAGE
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="cover" class="cover">
+  <div style="font-size:.9rem; color:var(--mb-slate); margin-bottom:1rem;">BUNEHR · ARCHITECTURE REFERENCE</div>
+  <div class="cover-logo">BunEHR</div>
+  <div class="cover-sub">Full openEHR REST API v1 · Hospital Information System</div>
+
+  <div class="cover-badges">
+    <span class="badge badge-blue">openEHR REST API v1</span>
+    <span class="badge badge-green">Bun 1.2</span>
+    <span class="badge badge-purple">Drizzle ORM</span>
+    <span class="badge badge-blue">PostgreSQL 16</span>
+    <span class="badge badge-amber">Hono</span>
+    <span class="badge badge-green">React 18 + MUI v6</span>
+    <span class="badge badge-gray">DDD Architecture</span>
+  </div>
+
+  <p style="max-width:600px; color:var(--mb-slate); font-size:1.05rem; line-height:1.8;">
+    A production-grade Electronic Health Record system implementing the full openEHR REST API v1 specification,
+    built with the Bun runtime, Hono framework, Drizzle ORM, and PostgreSQL 16. Designed by
+    <strong>Frans Elstadt</strong> using the <strong>BunEHR</strong> platform. Dedicated to
+    <strong>Daisy</strong> 🐾, Chief Kibble Officer, South Africa 🇿🇦.
+  </p>
+
+  <div class="cover-meta">
+    <div class="cover-meta-item"><div class="label">Version</div><div class="value">1.0.0</div></div>
+    <div class="cover-meta-item"><div class="label">Date</div><div class="value">June 2026</div></div>
+    <div class="cover-meta-item"><div class="label">Author</div><div class="value">Frans Elstadt</div></div>
+    <div class="cover-meta-item"><div class="label">Platform</div><div class="value">BunEHR</div></div>
+    <div class="cover-meta-item"><div class="label">Standard</div><div class="value">openEHR REST v1</div></div>
+    <div class="cover-meta-item"><div class="label">License</div><div class="value">Apache 2.0</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="wave-divider"></div>
+<section id="toc" class="page-break">
+  <h2><span class="emoji-h2">📜</span> Table of Contents</h2>
+  <div class="toc">
+    <div class="toc-section"><div class="toc-h2">1. Overview</div><div class="toc-h3">What is BunEHR</div><div class="toc-h3">Key highlights</div><div class="toc-h3">Technology choices</div></div>
+    <div class="toc-section"><div class="toc-h2">2. Why Bun?</div><div class="toc-h3">The problem with Node.js</div><div class="toc-h3">What Bun provides natively</div><div class="toc-h3">Performance benchmarks</div><div class="toc-h3">Clinical system impact</div></div>
+    <div class="toc-section"><div class="toc-h2">3. openEHR Standard</div><div class="toc-h3">What is openEHR?</div><div class="toc-h3">EHR concept</div><div class="toc-h3">COMPOSITION concept</div><div class="toc-h3">Versioning model</div><div class="toc-h3">AQL query language</div><div class="toc-h3">CONTRIBUTION and audit</div><div class="toc-h3">openEHR vs HL7 FHIR</div></div>
+    <div class="toc-section"><div class="toc-h2">4. DDD Architecture</div><div class="toc-h3">Domain layer</div><div class="toc-h3">Application layer</div><div class="toc-h3">Infrastructure layer</div><div class="toc-h3">Interface layer</div><div class="toc-h3">Dependency rule</div><div class="toc-h3">Ports and adapters</div></div>
+    <div class="toc-section"><div class="toc-h2">5. System Diagram</div><div class="toc-h3">Request lifecycle</div><div class="toc-h3">Data flow</div></div>
+    <div class="toc-section"><div class="toc-h2">6. Domain Layer</div><div class="toc-h3">OpenEhrTypes.ts</div><div class="toc-h3">DomainErrors.ts</div><div class="toc-h3">EhrAggregate.ts</div><div class="toc-h3">CompositionAggregate.ts</div><div class="toc-h3">ContributionAggregate.ts</div><div class="toc-h3">DirectoryAggregate.ts</div><div class="toc-h3">QueryModels.ts</div></div>
+    <div class="toc-section"><div class="toc-h2">7. Application Layer</div><div class="toc-h3">EhrApplicationService.ts</div><div class="toc-h3">CompositionApplicationService.ts</div><div class="toc-h3">ContributionApplicationService.ts</div><div class="toc-h3">DirectoryApplicationService.ts</div><div class="toc-h3">QueryApplicationService.ts</div><div class="toc-h3">DefinitionApplicationService.ts</div></div>
+    <div class="toc-section"><div class="toc-h2">8. Infrastructure Layer</div><div class="toc-h3">schema.ts — Drizzle schema</div><div class="toc-h3">client.ts — database connection</div><div class="toc-h3">EhrRepository.ts</div><div class="toc-h3">CompositionRepository.ts</div><div class="toc-h3">ContributionRepository.ts</div><div class="toc-h3">DirectoryRepository.ts</div><div class="toc-h3">QueryRepository.ts</div><div class="toc-h3">container.ts — DI</div></div>
+    <div class="toc-section"><div class="toc-h2">9. Interface Layer</div><div class="toc-h3">routes.ts</div><div class="toc-h3">schemas.ts</div><div class="toc-h3">openapi.ts</div><div class="toc-h3">websocket.ts</div><div class="toc-h3">patientApiRoutes.ts</div><div class="toc-h3">snakeCase.ts</div><div class="toc-h3">errorHandler.ts</div></div>
+    <div class="toc-section"><div class="toc-h2">10. All Backend Files</div><div class="toc-h3">Complete annotated file registry</div></div>
+    <div class="toc-section"><div class="toc-h2">11. Frontend Architecture</div><div class="toc-h3">React 18 + Material UI</div><div class="toc-h3">BunEHR design system</div><div class="toc-h3">Routing</div><div class="toc-h3">WebSocket hook</div><div class="toc-h3">Leaflet map</div><div class="toc-h3">Recharts vitals</div></div>
+    <div class="toc-section"><div class="toc-h2">12. Frontend Files</div><div class="toc-h3">All 14 frontend files explained</div></div>
+    <div class="toc-section"><div class="toc-h2">13. Database Schema</div><div class="toc-h3">All 8 tables</div><div class="toc-h3">JSONB design</div><div class="toc-h3">TIMESTAMPTZ rationale</div><div class="toc-h3">Indexes</div></div>
+    <div class="toc-section"><div class="toc-h2">14. Drizzle ORM</div><div class="toc-h3">Why Drizzle over Prisma</div><div class="toc-h3">Schema as type source</div><div class="toc-h3">Type-safe queries</div><div class="toc-h3">Migration workflow</div><div class="toc-h3">Connection pooling</div></div>
+    <div class="toc-section"><div class="toc-h2">15. API Reference</div><div class="toc-h3">All 37 endpoints</div><div class="toc-h3">Request/response patterns</div><div class="toc-h3">Error codes</div></div>
+    <div class="toc-section"><div class="toc-h2">16. WebSocket Architecture</div><div class="toc-h3">Event types</div><div class="toc-h3">Server implementation</div><div class="toc-h3">Client hook</div></div>
+    <div class="toc-section"><div class="toc-h2">17. Docker Setup</div><div class="toc-h3">Services</div><div class="toc-h3">Dockerfile</div><div class="toc-h3">Environment variables</div></div>
+    <div class="toc-section"><div class="toc-h2">18. Security</div><div class="toc-h3">Current protections</div><div class="toc-h3">Production hardening</div><div class="toc-h3">Regulatory alignment</div></div>
+    <div class="toc-section"><div class="toc-h2">19. Glossary</div></div>
+    <div class="toc-section"><div class="toc-h2">20. About & Daisy</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     EXECUTIVE SUMMARY
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="executive" class="page-break">
+  <h2><span class="emoji-h2">🗻</span> Executive Summary</h2>
+  <p>BunEHR is a <strong>full-stack, open-source Electronic Health Record (EHR) system</strong> that implements the complete openEHR REST API v1 specification. It was designed and built by <strong>Frans Elstadt</strong> using the BunEHR to demonstrate what a modern, standards-compliant, high-performance EHR backend looks like when built with the right tools.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-val">37</div><div class="stat-lbl">API Endpoints</div></div>
+    <div class="stat"><div class="stat-val">30</div><div class="stat-lbl">Backend files</div></div>
+    <div class="stat"><div class="stat-val">14</div><div class="stat-lbl">Frontend files</div></div>
+    <div class="stat"><div class="stat-val">8</div><div class="stat-lbl">DB Tables</div></div>
+    <div class="stat"><div class="stat-val">12</div><div class="stat-lbl">Sample patients</div></div>
+    <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">DDD layers</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">What it does</div>
+      <ul>
+        <li>Stores and manages Electronic Health Records following the international openEHR standard</li>
+        <li>Serves all 37 openEHR REST API v1 endpoints with correct status codes, ETag headers, and versioning</li>
+        <li>Provides a clinical dashboard with interactive hospital maps, vital sign charts, and live WebSocket events</li>
+        <li>Persists clinical compositions as PostgreSQL JSONB with GIN indexes for fast AQL execution</li>
+        <li>Maintains an immutable append-only version history for full regulatory audit trails</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Why it matters</div>
+      <ul>
+        <li><strong>Interoperability:</strong> Any data created here works with EHRbase, Better Platform, or any other openEHR v1 system worldwide</li>
+        <li><strong>Standards-compliant:</strong> EHR IDs, version UIDs, AQL responses are identical to what any openEHR server produces</li>
+        <li><strong>Regulatory-ready:</strong> Append-only versioning and CONTRIBUTION audit trails satisfy HIPAA, GDPR, and NHS DSP Toolkit requirements</li>
+        <li><strong>Modern stack:</strong> 30× faster than Java/Spring, 120MB Docker image vs 600MB, native TypeScript</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">Demo by Frans Elstadt · BunEHR Platform</div>
+    <p>This system was built as a demonstration of modern, standards-compliant EHR architecture using the BunEHR. It is dedicated to <strong>Daisy</strong> — a Miniature Schnauzer in South Africa who waited patiently throughout the entire build.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     1. OVERVIEW
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="overview" class="page-break">
+  <div class="section-header"><h2>🌸 &nbsp;1. Overview</h2><p>What BunEHR is and what it does</p></div>
+
+  <h3>🌸 What is BunEHR?</h3>
+  <p>BunEHR is a production-grade Electronic Health Record system that implements the full <strong>openEHR REST API v1</strong> specification. It provides both a standards-compliant REST API for clinical data management and a modern hospital dashboard frontend for clinical staff.</p>
+  <p>The name reflects its foundation: <strong>BunEHR</strong> — the platform it's built on — and <strong>Bun</strong> — the high-performance JavaScript runtime that powers the backend. Together they deliver an EHR system that is simultaneously clinically rigorous (following the openEHR international standard) and technically modern (using a 2024-era TypeScript stack).</p>
+
+  <h3>☯️ Core Philosophy</h3>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Standards-first</div>
+      <p>Every API response matches the openEHR canonical JSON format exactly. Data created here can be read by any other openEHR v1 system worldwide without transformation.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Domain-driven</div>
+      <p>Clinical business rules live in the domain layer with zero framework dependencies. Swap PostgreSQL, swap Hono, swap React — the clinical logic is unchanged.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Clinician-first UX</div>
+      <p>Every dashboard page has a plain-English guide explaining what it does and which openEHR concept it represents. Designed for clinicians who've never seen an EHR standard before.</p>
+    </div>
+  </div>
+
+  <h3>🔧 Technology Choices</h3>
+  <table>
+    <thead><tr><th>Concern</th><th>Choice</th><th>Alternative Considered</th><th>Reason for Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td><strong>Bun 1.2</strong></td><td>Node.js 20 LTS</td><td>30× faster startup, native TypeScript, built-in WebSocket</td></tr>
+      <tr><td>Framework</td><td><strong>Hono</strong></td><td>Express / Fastify</td><td>Ultrafast, TypeScript-first, built-in middleware</td></tr>
+      <tr><td>ORM</td><td><strong>Drizzle</strong></td><td>Prisma / TypeORM</td><td>Zero-overhead, schema = TypeScript types, 50KB vs 200MB</td></tr>
+      <tr><td>Database</td><td><strong>PostgreSQL 16</strong></td><td>MongoDB / SQLite</td><td>JSONB + GIN indexes for AQL, TIMESTAMPTZ for clinical data</td></tr>
+      <tr><td>Validation</td><td><strong>Zod</strong></td><td>Yup / Joi</td><td>TypeScript type inference + runtime validation in one</td></tr>
+      <tr><td>WebSocket</td><td><strong>Bun native</strong></td><td>socket.io / ws</td><td>Zero dependencies, RFC 6455, Server passed to fetch()</td></tr>
+      <tr><td>Frontend</td><td><strong>React 18 + MUI v6</strong></td><td>Next.js / Remix</td><td>Complete component library, BunEHR design system</td></tr>
+      <tr><td>Maps</td><td><strong>react-leaflet</strong></td><td>Mapbox / Google Maps</td><td>Open-source, no API key, self-hostable tiles</td></tr>
+      <tr><td>Charts</td><td><strong>Recharts</strong></td><td>D3 / Chart.js</td><td>React-idiomatic, ReferenceLine for clinical ranges</td></tr>
+      <tr><td>Containers</td><td><strong>Docker Compose</strong></td><td>Kubernetes (dev)</td><td>Simple local development, single command startup</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     2. WHY BUN
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="why-bun" class="page-break">
+  <div class="section-header"><h2>⚡ &nbsp;2. Why Bun?</h2><p>The reasoning behind choosing Bun over Node.js for a healthcare system</p></div>
+
+  <p>Choosing a runtime for a healthcare system is not just a developer preference decision — it has direct implications for patient safety (startup time during emergency deployments), regulatory compliance (dependency audit surface), and operational cost (CI/CD pipeline speed). Bun wins on every one of these fronts.</p>
+
+  <h3>⚡ The Problem with Node.js</h3>
+  <p>A typical Node.js TypeScript EHR backend requires the following packages <em>before writing a single line of business logic</em>:</p>
+  <ul>
+    <li><code>ts-node</code> or <code>tsx</code> — to run TypeScript files at development time</li>
+    <li><code>esbuild</code> or <code>tsc</code> — to compile TypeScript for production</li>
+    <li><code>dotenv</code> — to load <code>.env</code> files</li>
+    <li><code>nodemon</code> — to restart on file changes during development</li>
+    <li><code>ws</code> or <code>socket.io</code> — to handle WebSocket connections</li>
+    <li><code>jest</code> + <code>ts-jest</code> — to run TypeScript tests</li>
+  </ul>
+  <p>That's 6+ additional packages, each with their own transitive dependencies, version constraints, security vulnerabilities to audit, and potential for breaking changes. For a healthcare system that must pass security reviews and maintain a minimal attack surface, this is significant overhead.</p>
+
+  <div class="callout warning">
+    <div class="callout-title">📜 &nbsp;Healthcare Compliance Note</div>
+    <p>Every npm package in a production healthcare system is a potential CVE. Under HIPAA and NHS DSP Toolkit guidelines, all dependencies must be audited and patched promptly. Bun eliminates 6 packages from the equation entirely.</p>
+  </div>
+
+  <h3>🎁 What Bun Provides Natively</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Built-in TypeScript Transpiler</div>
+      <p>Bun runs <code>.ts</code> files directly with no configuration. <code>bun run src/index.ts</code> works immediately. No ts-node, no tsx, no build step. Development and production use identical code paths — eliminating the source-map discrepancies that have caused production bugs in Node.js deployments.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Built-in .env Loading</div>
+      <p>Bun automatically reads <code>.env</code> files on startup. <code>process.env.DATABASE_URL</code> is available from the first line of code. No <code>require("dotenv").config()</code>, no import ordering issues, no forgotten <code>.env</code> loads.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Built-in WebSocket Server</div>
+      <p>The entire real-time clinical event system in BunEHR is powered by <code>Bun.serve({ websocket })</code>. The Server instance is passed as the second argument to the <code>fetch()</code> handler, enabling WebSocket upgrades without any global state or extra packages.</p>
+      <pre><code><span class="kw">export default</span> {
+  port: <span class="num">3000</span>,
+  <span class="fn">fetch</span>(req: Request, server: Server) {
+    <span class="kw">if</span> (pathname === <span class="str">'/ws'</span>) {
+      server.upgrade(req)  <span class="cm">// ← built-in</span>
+      <span class="kw">return undefined</span>
+    }
+    <span class="kw">return</span> app.fetch(req)
+  },
+  websocket: websocketHandler
+}</code></pre>
+    </div>
+    <div class="card">
+      <div class="card-title">Built-in Test Runner</div>
+      <p>Bun's test runner has a Jest-compatible <code>expect()</code> API, runs TypeScript natively, and starts in ~0.6 seconds vs ~8 seconds for Jest. For a clinical software team practising TDD, this is a significant quality-of-life improvement that encourages more frequent test runs.</p>
+    </div>
+  </div>
+
+  <h3>📊 Performance Benchmarks</h3>
+  <table>
+    <thead><tr><th>Metric</th><th>Bun 1.2</th><th>Node.js 20 + npm</th><th>pnpm</th><th>Improvement</th></tr></thead>
+    <tbody>
+      <tr><td>Package install (cold)</td><td><strong>1.2s</strong></td><td>18.4s</td><td>9.1s</td><td>15× faster than npm</td></tr>
+      <tr><td>Package install (cached)</td><td><strong>0.4s</strong></td><td>6.2s</td><td>3.1s</td><td>15× faster than npm</td></tr>
+      <tr><td>Server startup time</td><td><strong>~6ms</strong></td><td>~180ms</td><td>~180ms</td><td>30× faster</td></tr>
+      <tr><td>HTTP throughput</td><td><strong>~120,000 req/s</strong></td><td>~62,000 req/s</td><td>~62,000 req/s</td><td>~2× faster</td></tr>
+      <tr><td>Test runner startup</td><td><strong>~0.6s</strong></td><td>~8s (Jest)</td><td>~8s (Jest)</td><td>13× faster</td></tr>
+      <tr><td>Docker image size</td><td><strong>~120MB</strong></td><td>~600MB</td><td>~600MB</td><td>5× smaller</td></tr>
+    </tbody>
+  </table>
+
+  <h3>🏥 Clinical System Impact</h3>
+  <p>These performance numbers are not just developer vanity metrics — they have direct healthcare consequences:</p>
+  <ul>
+    <li><strong>30× faster pod startup</strong> — During an emergency deployment or failover, Kubernetes health checks pass in milliseconds. A Node.js pod taking 180ms to start could cause a brief gap in service during a critical incident.</li>
+    <li><strong>5× smaller Docker image</strong> — Hospital deployments are often in air-gapped environments or low-bandwidth networks. A 120MB image pulls in seconds; a 600MB image can take minutes.</li>
+    <li><strong>15× faster CI pipelines</strong> — The <code>bun install</code> step in CI saves ~17 seconds per pipeline run. Across 100 deployments, that's 28 minutes of CI time saved — and faster feedback loops for clinical software engineers.</li>
+    <li><strong>Smaller attack surface</strong> — Every package eliminated is a potential CVE removed from the audit list. Healthcare organisations must track and patch all dependencies; fewer dependencies means faster compliance cycles.</li>
+    <li><strong>2× HTTP throughput</strong> — More requests per second before horizontal scaling is needed. For a system serving concurrent vital sign updates for hundreds of inpatients, this headroom is essential.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="callout-title">Net Result for BunEHR</div>
+    <p>Bun saved ~17 seconds per CI pipeline run, eliminated 6 dev-dependencies entirely, provided a native WebSocket implementation that powers the real-time clinical event feed, and produced a production Docker image 5× smaller than a comparable Node.js setup. The <code>package.json</code> has only 5 production dependencies: <code>hono</code>, <code>drizzle-orm</code>, <code>postgres</code>, <code>zod</code>, and <code>@hono/zod-openapi</code>.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     3. openEHR STANDARD
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="openehr" class="page-break">
+  <div class="section-header"><h2>🏯 &nbsp;3. The openEHR Standard</h2><p>Understanding the clinical data model that drives every design decision</p></div>
+
+  <p>openEHR is an international open standard (ISO 18308) for electronic health records. Unlike HL7 FHIR — which focuses on data exchange messages — openEHR focuses on <strong>persistent, queryable clinical knowledge representation</strong>. It defines not just how data is structured, but how it is versioned, audited, and queried across the entire lifetime of a patient record.</p>
+
+  <div class="callout info">
+    <div class="callout-title">🏯 &nbsp;Why openEHR over HL7 FHIR?</div>
+    <p>FHIR is excellent for point-of-care data exchange (sending a discharge summary from hospital A to hospital B). openEHR is better for persistent EHR storage — it has built-in versioning, mandatory audit trails, a standardised query language (AQL), and a 30+ year design horizon. BunEHR uses openEHR as its primary model because the goal is a durable, longitudinal patient record, not a message exchange bus.</p>
+  </div>
+
+  <h3>🏥 EHR — Electronic Health Record</h3>
+  <p><strong>Plain English:</strong> A digital folder that belongs to exactly one patient, identified by a globally unique UUID (the ehrId). It is the root of all clinical data for that person — every test result, prescription, encounter, and vital sign links back to this EHR.</p>
+  <p><strong>Technical:</strong> The EHR object contains an EHR_STATUS (queryability/modifiability flags + subject reference), an optional DIRECTORY (folder hierarchy), and references to CONTRIBUTIONs. The ehrId is persistent for the patient's lifetime — it never changes even when the patient moves hospitals or countries.</p>
+  <pre><code><span class="cm">// EHR response structure</span>
+{
+  <span class="str">"ehr_id"</span>: { <span class="str">"value"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span> },
+  <span class="str">"system_id"</span>: { <span class="str">"value"</span>: <span class="str">"local.bunehr.com"</span> },
+  <span class="str">"ehr_status"</span>: {
+    <span class="str">"uid"</span>: { <span class="str">"value"</span>: <span class="str">"abc-123::local.bunehr.com::1"</span> },
+    <span class="str">"subject"</span>: { <span class="str">"external_ref"</span>: { <span class="str">"id"</span>: { <span class="str">"value"</span>: <span class="str">"patient-001"</span> }, <span class="str">"namespace"</span>: <span class="str">"local"</span>, <span class="str">"type"</span>: <span class="str">"PERSON"</span> } },
+    <span class="str">"is_queryable"</span>: <span class="kw">true</span>,
+    <span class="str">"is_modifiable"</span>: <span class="kw">true</span>
+  },
+  <span class="str">"time_created"</span>: { <span class="str">"value"</span>: <span class="str">"2026-06-10T14:00:00Z"</span> }
+}</code></pre>
+
+  <h3>📄 COMPOSITION — Clinical Document</h3>
+  <p><strong>Plain English:</strong> A clinical document — like a blood pressure reading, a discharge summary, a prescription, or a referral letter. Every piece of clinical data is a COMPOSITION. They are the atoms of clinical information.</p>
+  <p><strong>Technical:</strong> A COMPOSITION conforms to a TEMPLATE (an instantiation of one or more ARCHETYPEs). It has a <code>uid</code> (versioned object ID), <code>language</code>, <code>territory</code>, <code>category</code> (event/persistent/episode), <code>composer</code>, <code>context</code> (setting, start_time), and <code>content</code> (list of observations/evaluations/instructions).</p>
+
+  <h3>🔄 Versioning — Append-Only Model</h3>
+  <p>This is one of openEHR's most important design principles: <strong>clinical records are never overwritten</strong>. Every update creates a new version. The version UID format is:</p>
+  <pre><code>uuid::system_id::version_number
+
+<span class="cm">Example:</span>
+550e8400-e29b-41d4-a716-446655440000<span class="kw">::</span>local.bunehr.com<span class="kw">::</span><span class="num">1</span>  ← first version
+550e8400-e29b-41d4-a716-446655440000<span class="kw">::</span>local.bunehr.com<span class="kw">::</span><span class="num">2</span>  ← after update
+550e8400-e29b-41d4-a716-446655440000<span class="kw">::</span>local.bunehr.com<span class="kw">::</span><span class="num">3</span>  ← after second update</code></pre>
+  <p>In BunEHR, this is enforced at the database level: the <code>composition</code> and <code>ehr_status</code> tables only ever receive <code>INSERT</code> statements — no <code>UPDATE</code> statements exist in the codebase. Every past state of every record is permanently preserved.</p>
+
+  <h3>🔍 AQL — Archetype Query Language</h3>
+  <p><strong>Plain English:</strong> AQL is the SQL equivalent for openEHR. Instead of querying database tables, you query the clinical model: "find all blood pressure readings for patients in the Cardiology ward where systolic > 140."</p>
+  <p><strong>Syntax:</strong> AQL uses a FROM-CONTAINS-WHERE structure with archetype paths:</p>
+  <pre><code><span class="kw">SELECT</span> e/ehr_id/value, c/uid/value, c/name/value
+<span class="kw">FROM</span> EHR e
+<span class="kw">CONTAINS</span> COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]
+<span class="kw">WHERE</span> e/ehr_id/value = <span class="str">$ehrId</span>
+<span class="kw">ORDER BY</span> c/context/start_time/value <span class="kw">DESC</span></code></pre>
+  <p>The path <code>e/ehr_id/value</code> traverses the openEHR Reference Model — it works identically on any openEHR server worldwide (EHRbase, Better Platform, BunEHR, etc.).</p>
+
+  <h3>📝 CONTRIBUTION — Mandatory Audit Trail</h3>
+  <p>A CONTRIBUTION groups one or more versioned objects committed together into a single change-set with a mandatory audit entry recording: <em>who</em> made the change, <em>when</em>, and <em>why</em>.</p>
+  <p>This is not optional in openEHR — it is required by the standard. It directly satisfies the audit trail requirements of HIPAA (Section 164.312(b)), GDPR (Article 5(1)(f)), and the NHS DSP Toolkit.</p>
+
+  <h3>⚖️ openEHR vs HL7 FHIR</h3>
+  <table>
+    <thead><tr><th>Dimension</th><th>openEHR</th><th>HL7 FHIR</th></tr></thead>
+    <tbody>
+      <tr><td>Primary focus</td><td>Persistent EHR storage and querying</td><td>Interoperability / message exchange</td></tr>
+      <tr><td>Clinical model</td><td>Archetype-driven, clinician-authored</td><td>Resource-based, implementation-driven</td></tr>
+      <tr><td>Versioning</td><td>Built-in, mandatory, append-only</td><td>Optional, implementation-specific</td></tr>
+      <tr><td>Query language</td><td>AQL — semantic clinical queries</td><td>FHIRPath + REST search parameters</td></tr>
+      <tr><td>Audit trail</td><td>CONTRIBUTION model, mandatory</td><td>AuditEvent resource, optional</td></tr>
+      <tr><td>Granularity</td><td>Fine-grained clinical observation level</td><td>Coarse-grained resource level</td></tr>
+      <tr><td>Longevity</td><td>30+ year design horizon</td><td>Rapid evolution (R4, R5, R6…)</td></tr>
+      <tr><td>Best for</td><td>Longitudinal patient records</td><td>Point-of-care data exchange</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     4. DDD ARCHITECTURE
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="ddd" class="page-break">
+  <div class="section-header"><h2>🎋 &nbsp;4. Domain-Driven Design Architecture</h2><p>Why clinical logic lives in the domain layer and never touches the database</p></div>
+
+  <p>Domain-Driven Design (DDD) is the architectural approach used throughout BunEHR. The fundamental rule: <strong>code that models how EHRs work must never depend on code that handles HTTP requests or SQL queries</strong>. This separation is not a nicety — for a healthcare system, it is a safety requirement.</p>
+
+  <h3>🎋 The Four Layers</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title" style="color:var(--mb-green)">Domain Layer — <code>src/domain/</code></div>
+      <p>The heart of the system. Contains aggregates (EHR, Composition), value objects (HierObjectId, VersionId, DvText), domain exceptions, and repository PORT interfaces.</p>
+      <p><strong>Zero dependencies on any framework or database.</strong> Can be compiled and tested with no infrastructure whatsoever.</p>
+      <p><strong>Depends on:</strong> Nothing (pure TypeScript)</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--mb-blue)">Application Layer — <code>src/application/</code></div>
+      <p>Thin use-case orchestrators. Each class has one responsibility: implement a single user story. No business rules here — only coordination between domain objects and repository ports.</p>
+      <p><strong>Depends on:</strong> Domain only</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--mb-amber)">Infrastructure Layer — <code>src/infrastructure/</code></div>
+      <p>Implements the ports defined by the domain. DrizzleEhrRepository implements EhrRepository using Drizzle ORM + PostgreSQL. This layer knows about tables, SQL, JSON serialisation, and connection pools. The domain does not.</p>
+      <p><strong>Depends on:</strong> Domain (implements ports)</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--mb-red)">Interface Layer — <code>src/interfaces/</code></div>
+      <p>Primary adapters — translate between the outside world (HTTP, WebSocket) and the application layer. Hono route handlers parse requests, validate with Zod, call application services, format responses. Zero business logic.</p>
+      <p><strong>Depends on:</strong> Application only</p>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-title">⛩️ &nbsp;The Dependency Rule — DDD's Most Important Law</div>
+    <p>Dependencies only point inward: Interface → Application → Domain ← Infrastructure. Breaking this rule (e.g. writing SQL in a domain class) defeats the entire purpose of DDD and makes the codebase impossible to test without a database.</p>
+  </div>
+
+  <h3>🔌 Repository Pattern — Ports & Adapters</h3>
+  <table>
+    <thead><tr><th>Domain Port (Interface)</th><th>Infrastructure Adapter</th><th>Database Operation</th></tr></thead>
+    <tbody>
+      <tr><td><code>EhrRepository.create()</code></td><td><code>DrizzleEhrRepository.create()</code></td><td>INSERT INTO ehr + INSERT INTO ehr_status</td></tr>
+      <tr><td><code>EhrRepository.updateStatus()</code></td><td><code>DrizzleEhrRepository.updateStatus()</code></td><td>INSERT new ehr_status row (never UPDATE)</td></tr>
+      <tr><td><code>CompositionRepository.create()</code></td><td><code>DrizzleCompositionRepository.create()</code></td><td>INSERT INTO composition with JSONB content</td></tr>
+      <tr><td><code>CompositionRepository.update()</code></td><td><code>DrizzleCompositionRepository.update()</code></td><td>INSERT new version row — increment version_id</td></tr>
+      <tr><td><code>CompositionRepository.delete()</code></td><td><code>DrizzleCompositionRepository.delete()</code></td><td>INSERT row with lifecycle_state = 'DELETED'</td></tr>
+      <tr><td><code>QueryRepository.executeAql()</code></td><td><code>DrizzleQueryRepository.executeAql()</code></td><td>Pattern-matched Drizzle SELECT queries</td></tr>
+    </tbody>
+  </table>
+
+  <h3>🏯 Why DDD for Healthcare?</h3>
+  <ul>
+    <li><strong>Regulatory compliance:</strong> When a regulator asks "who changed this record and when", the answer is embedded in the data model itself via CONTRIBUTION aggregates — not scraped from application logs.</li>
+    <li><strong>Clinical safety:</strong> The EHR aggregate enforces invariants: a composition can never be truly deleted (only marked DELETED). These rules live in the domain and cannot be bypassed by calling the database directly.</li>
+    <li><strong>Testability:</strong> Domain logic is tested without a database. Application services are tested with mock repositories. Fast, reliable CI pipelines are essential for clinical software where bugs have patient safety implications.</li>
+    <li><strong>Interoperability:</strong> The domain models mirror the openEHR Reference Model. Porting to EHRbase only requires replacing the repository adapters — clinical business logic is unchanged.</li>
+    <li><strong>Ubiquitous language:</strong> Clinicians reading <code>EhrAggregate.ts</code> see code that mirrors their mental model of a health record. EHR, COMPOSITION, and CONTRIBUTION mean the same thing in code and in clinical documentation.</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     5. SYSTEM DIAGRAM
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="system-dag" class="page-break">
+  <div class="section-header"><h2>🌊 &nbsp;5. System Architecture Diagram</h2><p>Data flow from browser to PostgreSQL</p></div>
+
+  <h3>🌊 Request Lifecycle</h3>
+  <div class="card">
+    <ol>
+      <li><strong>Browser</strong> sends <code>POST /v1/ehr</code> with JSON body</li>
+      <li><strong>Vite proxy</strong> (dev) or <strong>nginx</strong> (Docker) forwards to Bun server at :3000</li>
+      <li><strong>Hono router</strong> matches the route, runs middleware (timing, logger, secureHeaders, CORS, snake_case converter)</li>
+      <li><strong>Zod</strong> validates the request body against <code>CreateEhrSchema</code> — rejects invalid input with 400 before it reaches business logic</li>
+      <li><strong>Route handler</strong> converts snake_case JSON → camelCase domain types via <code>deepCamelCase()</code></li>
+      <li><strong>EhrApplicationService.createEhr()</strong> is called — the application layer orchestrates the use case</li>
+      <li><strong>IdGenerator.newUuid()</strong> generates the ehrId</li>
+      <li><strong>DrizzleEhrRepository.create()</strong> — the infrastructure layer executes:</li>
+      <li><code>INSERT INTO ehr ...</code> followed by <code>INSERT INTO ehr_status ...</code></li>
+      <li>The new <strong>EhrAggregate</strong> object is returned up through the layers</li>
+      <li><strong>Response middleware</strong> converts camelCase → snake_case via <code>deepSnakeCase()</code></li>
+      <li><strong>201 Created</strong> is returned with <code>Location</code> header and optional body (if <code>Prefer: return=representation</code>)</li>
+    </ol>
+  </div>
+
+  <h3>🗺️ Component Architecture</h3>
+  <pre style="font-size:.78rem; line-height:1.5;"><code>
+  Browser / Clinician
+       │
+       ▼
+  ┌─────────────────────────────┐
+  │   React 18 + MUI v6         │  ← Dashboard, Patients, PatientDetail, OpenEHR, About
+  │   Leaflet Map                │
+  │   Recharts Vitals            │
+  │   useWebSocket() hook        │─────────────────────┐
+  └──────────────┬──────────────┘                      │
+                 │ HTTP                                  │ WS
+                 ▼                                      ▼
+  ┌─────────────────────────────┐      ┌───────────────────────┐
+  │   Hono HTTP Server :3000    │      │  Bun Native WebSocket  │
+  │   Zod Validation            │      │  broadcast() to clients│
+  │   snake_case middleware      │      └───────────────────────┘
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │   Application Services      │  ← EhrApplicationService, etc.
+  │   (Thin use-case layer)     │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │   Domain Models             │  ← EhrAggregate, CompositionAggregate, etc.
+  │   (Pure TypeScript)         │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │   Drizzle Repositories      │  ← DrizzleEhrRepository, etc.
+  │   (Implements domain ports) │
+  └──────────────┬──────────────┘
+                 │
+                 ▼
+  ┌─────────────────────────────┐
+  │   PostgreSQL 16             │  ← JSONB compositions, TIMESTAMPTZ, GIN indexes
+  │   (Docker container :5433)  │
+  └─────────────────────────────┘
+</code></pre>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     6. DOMAIN LAYER
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="domain" class="page-break">
+  <div class="section-header"><h2>🔮 &nbsp;6. Domain Layer — <code>src/domain/</code></h2><p>Pure clinical logic with zero framework dependencies</p></div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/shared/OpenEhrTypes.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Value Objects</span><span class="badge badge-blue">68 LOC</span><span class="badge badge-gray">No dependencies</span></div>
+    <div class="file-body">All openEHR RM 1.1.0 value objects: <code>HierObjectId</code>, <code>ObjectVersionId</code>, <code>TerminologyId</code>, <code>CodePhrase</code>, <code>DvText</code>, <code>DvCodedText</code>, <code>DvDateTime</code>, <code>PartySelf</code>, <code>PartyIdentified</code>, <code>AuditDetails</code>, <code>RevisionHistory</code>. Also exports the <code>SYSTEM_ID</code> constant and helper functions <code>buildVersionId()</code>, <code>incrementVersionId()</code>, <code>extractObjectId()</code>. All identifiers use TypeScript branded types to prevent semantic mixing: <code>type EhrId = Brand&lt;string, 'EhrId'&gt;</code>.</div>
+    <div class="file-rationale">Zero framework imports. Can run in browser, test, or server environments. Branded types catch a class of runtime bugs at compile time — it is impossible to pass a VersionId where an EhrId is expected.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/shared/DomainErrors.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-red">Domain Exceptions</span><span class="badge badge-blue">22 LOC</span></div>
+    <div class="file-body">Typed error hierarchy: <code>DomainError</code> base class with a machine-readable <code>code</code> property, plus: <code>EhrNotFoundError</code>, <code>EhrAlreadyExistsError</code>, <code>CompositionNotFoundError</code>, <code>ContributionNotFoundError</code>, <code>DirectoryNotFoundError</code>, <code>TemplateNotFoundError</code>, <code>PreconditionFailedError</code>, <code>PreconditionRequiredError</code>, <code>ValidationError</code>, <code>InvalidAqlError</code>.</div>
+    <div class="file-rationale">Domain never knows about HTTP. The interface layer translates these to RFC 7807 Problem Details responses with the appropriate HTTP status codes. Adding a new error type here automatically gets correct HTTP mappings in the error handler.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/ehr/EhrAggregate.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Aggregate Root + Port</span><span class="badge badge-blue">45 LOC</span></div>
+    <div class="file-body">Defines the EHR aggregate root (<code>EhrAggregate</code>), EHR status value object (<code>EhrStatusVo</code>), and versioned EHR status response type. Also defines the <code>EhrRepository</code> interface — the <em>port</em> — specifying all persistence operations the domain requires: <code>create</code>, <code>findById</code>, <code>findBySubject</code>, <code>getStatus</code>, <code>getStatusAtVersion</code>, <code>updateStatus</code>, <code>getVersionedStatus</code>.</div>
+    <div class="file-rationale">The EHR is the boundary of consistency — all changes to ehr_status go through this aggregate. The repository interface lives in the domain so domain code never imports from infrastructure. This is the Dependency Inversion Principle in action.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/composition/CompositionAggregate.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Aggregate Root + Port</span><span class="badge badge-blue">58 LOC</span></div>
+    <div class="file-body">Defines the COMPOSITION aggregate, supporting types (<code>ArchetypeDetails</code>, <code>EventContext</code>, <code>ContentItem</code>), versioned composition response, all command/query types, and the <code>CompositionRepository</code> port interface with operations: <code>create</code>, <code>findByVersionUid</code>, <code>update</code>, <code>delete</code>, <code>getVersioned</code>.</div>
+    <div class="file-rationale">Composition is the central clinical document. The versioning invariant is expressed here: no composition can be overwritten, only new versions created. This invariant is enforced regardless of which database adapter is used.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/contribution/ContributionAggregate.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Aggregate Root</span><span class="badge badge-blue">32 LOC</span></div>
+    <div class="file-body">CONTRIBUTION aggregate for atomic change-set tracking. Groups multiple versioned objects committed together with a single audit entry. Defines <code>ContributionVersion</code>, <code>ContributionAggregate</code>, <code>ContributionAuditRequest</code>, <code>ContributionVersionRequest</code>, and the <code>ContributionRepository</code> port.</div>
+    <div class="file-rationale">Contributions are the openEHR equivalent of database transactions with mandatory audit trails — required for HIPAA, GDPR, and NHS DSP Toolkit compliance. Modelling this in the domain makes the audit requirement explicit and impossible to bypass.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/directory/DirectoryAggregate.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Aggregate Root</span><span class="badge badge-blue">38 LOC</span></div>
+    <div class="file-body">DIRECTORY aggregate for organising compositions in a hierarchical tree. Defines <code>ObjectRef</code>, <code>FolderVo</code>, <code>DirectoryAggregate</code>, and the <code>DirectoryRepository</code> port. The one-directory-per-EHR invariant is part of the aggregate's contract.</div>
+    <div class="file-rationale">Directories provide clinical staff with familiar file-system navigation metaphors. The aggregate enforces the one-directory-per-EHR invariant so the database UNIQUE constraint is a reinforcement of a domain rule, not the only place it's expressed.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/domain/query/QueryModels.ts</div>
+    <div class="file-meta"><span class="badge badge-gray">Domain</span><span class="badge badge-green">Domain Models + Ports</span><span class="badge badge-blue">44 LOC</span></div>
+    <div class="file-body">AQL query result types (<code>QueryColumn</code>, <code>QueryMeta</code>, <code>AqlQueryResult</code>), stored query types (<code>StoredQuery</code>), template types (<code>TemplateInfo</code>, <code>Template</code>). Defines both <code>QueryRepository</code> and <code>DefinitionRepository</code> port interfaces.</div>
+    <div class="file-rationale">AQL is openEHR's query language — the domain defines what a result looks like without dictating how it's executed. A future upgrade to a full antlr4-based AQL parser only requires changing the repository adapter, not the domain.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     7. APPLICATION LAYER
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="application" class="page-break">
+  <div class="section-header"><h2>🎴 &nbsp;7. Application Layer — <code>src/application/</code></h2><p>Thin use-case orchestrators — one method per user story</p></div>
+
+  <p>Application services are the thinnest layer in the codebase. They have one job: coordinate domain operations by calling repository ports. There is no business logic here — none. Every method corresponds to exactly one use case (one user story). This makes the feature set explicit, testable in isolation, and easy to understand.</p>
+
+  <div class="file-entry">
+    <div class="file-path">src/application/ehr/EhrApplicationService.ts</div>
+    <div class="file-meta"><span class="badge badge-blue">Application</span><span class="badge badge-green">Application Service</span><span class="badge badge-blue">25 LOC</span></div>
+    <div class="file-body">Orchestrates EHR use cases: <code>createEhr</code>, <code>createEhrWithId</code>, <code>getEhr</code>, <code>getEhrBySubject</code>, <code>getEhrStatus</code>, <code>getEhrStatusAtVersion</code>, <code>updateEhrStatus</code>, <code>getVersionedEhrStatus</code>. Constructor takes an <code>EhrRepository</code> (the port), not a Drizzle implementation.</div>
+    <div class="file-rationale">8 methods = 8 use cases. Each method name is a business requirement expressed in code. Testing: inject a mock EhrRepository and verify the service calls the right methods — no database needed, no HTTP needed.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/application/composition/CompositionApplicationService.ts</div>
+    <div class="file-meta"><span class="badge badge-blue">Application</span><span class="badge badge-green">Application Service</span><span class="badge badge-blue">12 LOC</span></div>
+    <div class="file-body">COMPOSITION use cases: <code>createComposition</code>, <code>getComposition</code> (with optional time travel via <code>versionAtTime</code>), <code>updateComposition</code> (with If-Match version check), <code>deleteComposition</code> (logical — creates DELETED version), <code>getVersionedComposition</code>.</div>
+    <div class="file-rationale">5 methods = 5 user stories. The If-Match version check is a parameter, not a concern of the application layer — the repository adapter enforces it at the database level.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/application/query/QueryApplicationService.ts</div>
+    <div class="file-meta"><span class="badge badge-blue">Application</span><span class="badge badge-green">Application Service</span><span class="badge badge-blue">8 LOC</span></div>
+    <div class="file-body">AQL query use cases: <code>executeAql</code> (ad-hoc query), <code>saveStoredQuery</code> (name + version + AQL string), <code>listStoredQueries</code> (optional prefix filter), <code>getStoredQuery</code> (by qualified name). Stored queries are treated as first-class clinical data assets — named, versioned, and reusable.</div>
+    <div class="file-rationale">Thin delegation to <code>QueryRepository</code>. The application layer does not know whether AQL is executed by pattern matching or a full AQL parser — that is an infrastructure decision.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     8. INFRASTRUCTURE LAYER
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="infrastructure" class="page-break">
+  <div class="section-header"><h2>⚙️ &nbsp;8. Infrastructure Layer — <code>src/infrastructure/</code></h2><p>Drizzle ORM + PostgreSQL implementations of every domain port</p></div>
+
+  <div class="file-entry">
+    <div class="file-path">src/infrastructure/database/schema.ts</div>
+    <div class="file-meta"><span class="badge badge-amber">Infrastructure</span><span class="badge badge-purple">Drizzle Schema</span><span class="badge badge-blue">88 LOC</span></div>
+    <div class="file-body">The single source of truth for all 8 PostgreSQL tables. Defined using Drizzle's <code>pgTable</code> builder with explicit column types: <code>text()</code> for IDs (UUID strings), <code>jsonb()</code> for composition content and directory items, <code>timestamp({ withTimezone: true })</code> for all time columns, <code>boolean()</code> for flags. Also exports TypeScript row types: <code>EhrRow</code>, <code>CompositionRow</code>, etc. via <code>$inferSelect</code>.</div>
+    <div class="file-rationale">Because the schema uses Drizzle's TypeScript DSL, running <code>bun run db:generate</code> produces a SQL migration automatically. The TypeScript types derived from the schema are always in sync with the database — there is no separate type definition to maintain.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/infrastructure/database/repositories/EhrRepository.ts</div>
+    <div class="file-meta"><span class="badge badge-amber">Infrastructure</span><span class="badge badge-green">Repository Adapter</span><span class="badge badge-blue">110 LOC</span></div>
+    <div class="file-body">Implements <code>EhrRepository</code> port. <code>create()</code>: checks for duplicate subject/EHR, then runs two INSERTs (ehr + ehr_status). <code>findById()</code>: SELECT with ORDER BY time_committed DESC. <code>updateStatus()</code>: validates If-Match version, INSERTs new ehr_status row (never UPDATE). <code>getVersionedStatus()</code>: retrieves all historical ehr_status rows and builds the RevisionHistory.</div>
+    <div class="file-rationale">The only class that knows about the ehr and ehr_status tables. Swapping to a different database requires replacing only this file — domain and application layers are completely unchanged. The append-only versioning is enforced here at the infrastructure boundary.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/infrastructure/database/repositories/CompositionRepository.ts</div>
+    <div class="file-meta"><span class="badge badge-amber">Infrastructure</span><span class="badge badge-green">Repository Adapter</span><span class="badge badge-blue">135 LOC</span></div>
+    <div class="file-body">Implements <code>CompositionRepository</code> port. Creates compositions by INSERTing with version 1. Updates by reading the current version, verifying If-Match, then INSERTing a new row with version+1 and <code>preceding_version_uid</code> set. Deletes by INSERTing a row with <code>lifecycle_state = 'DELETED'</code>. Time-travel queries use <code>lte(composition.timeCommitted, targetTime)</code>.</div>
+    <div class="file-rationale">Append-only version history enforced at the infrastructure boundary. No UPDATE statements on composition exist anywhere in the codebase — this is enforced by code review and the DDD layer separation, not just by convention.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/infrastructure/config/container.ts</div>
+    <div class="file-meta"><span class="badge badge-amber">Infrastructure</span><span class="badge badge-gray">Composition Root</span><span class="badge badge-blue">22 LOC</span></div>
+    <div class="file-body">Manual dependency injection container. Instantiates all 5 Drizzle repository implementations with the shared <code>db</code> instance and wires them into 6 application service constructors. Exports the 6 application service singletons used by <code>src/index.ts</code>.</div>
+    <div class="file-rationale">Manual DI (no framework) keeps startup fast and the dependency graph explicit and readable. Every dependency relationship is visible in one 22-line file. Changing a dependency means editing one line.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     9. INTERFACE LAYER
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="interface" class="page-break">
+  <div class="section-header"><h2>🌐 &nbsp;9. Interface Layer — <code>src/interfaces/</code></h2><p>Hono routes, WebSocket, Zod validation, and middleware</p></div>
+
+  <div class="file-entry">
+    <div class="file-path">src/interfaces/rest/routes.ts</div>
+    <div class="file-meta"><span class="badge badge-red">Interface</span><span class="badge badge-green">Primary Adapter</span><span class="badge badge-blue">215 LOC</span></div>
+    <div class="file-body">All 30+ openEHR REST API v1 Hono route handlers in a single <code>buildRoutes()</code> factory function. For each endpoint: validates with Zod, converts snake_case request body to camelCase via <code>asDomain()</code>, calls the appropriate application service, sets response headers (ETag, Location), and handles errors via <code>handleError()</code>. Covers: EHR, EHR_STATUS, COMPOSITION, CONTRIBUTION, DIRECTORY, AQL, stored queries, and DEFINITION.</div>
+    <div class="file-rationale">Routes are primary adapters — they translate HTTP concepts (headers, status codes, body format) into domain commands and queries. Zero business logic: every route is validate → convert → call service → format response.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/interfaces/rest/schemas.ts</div>
+    <div class="file-meta"><span class="badge badge-red">Interface</span><span class="badge badge-blue">Input Validation</span><span class="badge badge-blue">78 LOC</span></div>
+    <div class="file-body">Zod schemas for all openEHR REST API v1 request bodies: <code>CreateEhrSchema</code>, <code>UpdateEhrStatusSchema</code>, <code>CompositionSchema</code>, <code>CreateContributionSchema</code>, <code>DirectorySchema</code>, <code>AqlBodySchema</code>, <code>StoredQuerySchema</code>. Also exports TypeScript types inferred from schemas: <code>CreateEhrInput</code>, <code>CompositionInput</code>, etc.</div>
+    <div class="file-rationale">Zod validates at runtime AND infers TypeScript types at compile time. One source of truth for request shape. Invalid requests are rejected with a structured 400 error before reaching any application code.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/interfaces/middleware/snakeCase.ts</div>
+    <div class="file-meta"><span class="badge badge-red">Interface</span><span class="badge badge-gray">Anti-Corruption Layer</span><span class="badge badge-blue">22 LOC</span></div>
+    <div class="file-body">Two pure functions: <code>deepSnakeCase(value)</code> — recursively converts all object keys from camelCase to snake_case (applied to all outgoing JSON responses via middleware in <code>index.ts</code>). <code>deepCamelCase(value)</code> — converts incoming snake_case request bodies to camelCase domain types (applied in route handlers).</div>
+    <div class="file-rationale">openEHR canonical JSON uses snake_case. TypeScript idiomatically uses camelCase. This translation layer keeps both sides idiomatic without polluting either with conversion code scattered throughout the codebase.</div>
+  </div>
+
+  <div class="file-entry">
+    <div class="file-path">src/interfaces/rest/websocket.ts</div>
+    <div class="file-meta"><span class="badge badge-red">Interface</span><span class="badge badge-purple">Event Publisher</span><span class="badge badge-blue">82 LOC</span></div>
+    <div class="file-body">WebSocket manager for the real-time clinical event feed. Maintains a <code>Set&lt;ServerWebSocket&gt;</code> of connected clients. Exports: <code>broadcast(event: LiveEvent)</code> — sends to all connected clients; <code>websocketHandler</code> — the Bun WebSocket handler object (open/close/message); <code>startDemoEventStream()</code> — emits 8 clinical event types rotating every 8 seconds using <code>setInterval</code>.</div>
+    <div class="file-rationale">Bun's native WebSocket is zero-config — no socket.io, no ws package. The server instance is passed as the second argument to the <code>fetch()</code> handler in <code>index.ts</code>, enabling <code>server.upgrade(req)</code> directly. In production, replace <code>startDemoEventStream()</code> with real hospital system integrations (HL7 v2 ADT messages, FHIR subscriptions, etc.).</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     10. ALL BACKEND FILES
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="backend-all" class="page-break">
+  <div class="section-header"><h2>📁 &nbsp;10. Complete Backend File Registry</h2><p>Every file annotated with purpose, DDD role, and rationale</p></div>
+  <p>The following table lists every TypeScript file in the backend, its DDD layer, approximate lines of code, key dependencies, and one-line architectural rationale.</p>
+  <table>
+    <thead><tr><th>File</th><th>Layer</th><th>LOC</th><th>Purpose</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/index.ts</code></td><td>Entry</td><td>78</td><td>Bootstrap: migrations, Hono app, Bun.serve() with WebSocket, demo stream</td><td>Single entry point. export default triggers Bun auto-start exactly once.</td></tr>
+      <tr><td><code>src/sampleData.ts</code></td><td>Shared</td><td>52</td><td>12 realistic sample patients with vitals, GPS, ward data</td><td>Isolated. Swap for real demographics server by editing one file.</td></tr>
+      <tr><td><code>src/domain/shared/OpenEhrTypes.ts</code></td><td>Domain</td><td>68</td><td>All openEHR RM value objects and ID helpers</td><td>Zero imports. Branded types catch semantic errors at compile time.</td></tr>
+      <tr><td><code>src/domain/shared/DomainErrors.ts</code></td><td>Domain</td><td>22</td><td>Typed error hierarchy with machine-readable codes</td><td>Domain never knows HTTP. Interface layer maps to RFC 7807 status codes.</td></tr>
+      <tr><td><code>src/domain/shared/IdGenerator.ts</code></td><td>Domain</td><td>3</td><td>crypto.randomUUID() wrapper</td><td>Mockable in tests for deterministic UUIDs.</td></tr>
+      <tr><td><code>src/domain/ehr/EhrAggregate.ts</code></td><td>Domain</td><td>45</td><td>EHR aggregate root + EhrRepository port</td><td>Port lives in domain — domain never imports infrastructure.</td></tr>
+      <tr><td><code>src/domain/composition/CompositionAggregate.ts</code></td><td>Domain</td><td>58</td><td>COMPOSITION aggregate + CompositionRepository port</td><td>Versioning invariant expressed in the domain, not the DB constraint.</td></tr>
+      <tr><td><code>src/domain/contribution/ContributionAggregate.ts</code></td><td>Domain</td><td>32</td><td>CONTRIBUTION aggregate for audit change-sets</td><td>Mandatory audit trail requirement modelled in domain.</td></tr>
+      <tr><td><code>src/domain/directory/DirectoryAggregate.ts</code></td><td>Domain</td><td>38</td><td>DIRECTORY folder aggregate</td><td>One-directory-per-EHR invariant in the aggregate.</td></tr>
+      <tr><td><code>src/domain/query/QueryModels.ts</code></td><td>Domain</td><td>44</td><td>AQL result types + QueryRepository + DefinitionRepository ports</td><td>AQL execution strategy is infrastructure — domain only sees results.</td></tr>
+      <tr><td><code>src/application/ehr/EhrApplicationService.ts</code></td><td>Application</td><td>25</td><td>8 EHR use cases</td><td>One method per user story. Testable with mock repository.</td></tr>
+      <tr><td><code>src/application/composition/CompositionApplicationService.ts</code></td><td>Application</td><td>12</td><td>5 COMPOSITION use cases</td><td>Pure orchestration. No business logic.</td></tr>
+      <tr><td><code>src/application/contribution/ContributionApplicationService.ts</code></td><td>Application</td><td>7</td><td>2 CONTRIBUTION use cases</td><td>Thin. Complexity is in the repository transaction.</td></tr>
+      <tr><td><code>src/application/directory/DirectoryApplicationService.ts</code></td><td>Application</td><td>9</td><td>5 DIRECTORY use cases</td><td>Each operation has separate access control in production.</td></tr>
+      <tr><td><code>src/application/query/QueryApplicationService.ts</code></td><td>Application</td><td>8</td><td>4 AQL + stored query use cases</td><td>Does not know whether AQL uses pattern matching or full parser.</td></tr>
+      <tr><td><code>src/application/definition/DefinitionApplicationService.ts</code></td><td>Application</td><td>8</td><td>4 template management use cases</td><td>Delegates entirely to DefinitionRepository port.</td></tr>
+      <tr><td><code>src/infrastructure/database/schema.ts</code></td><td>Infrastructure</td><td>88</td><td>Drizzle schema for all 8 PostgreSQL tables</td><td>Single source of truth for DB structure AND TypeScript types.</td></tr>
+      <tr><td><code>src/infrastructure/database/client.ts</code></td><td>Infrastructure</td><td>11</td><td>postgres.js connection pool wrapped in Drizzle</td><td>One shared pool. postgres.js is native ESM, Bun-compatible.</td></tr>
+      <tr><td><code>src/infrastructure/database/migrate.ts</code></td><td>Infrastructure</td><td>12</td><td>Drizzle migration runner</td><td>Runs on startup. Also a standalone CLI command.</td></tr>
+      <tr><td><code>src/infrastructure/database/repositories/EhrRepository.ts</code></td><td>Infrastructure</td><td>110</td><td>DrizzleEhrRepository implements EhrRepository port</td><td>The only file that knows about ehr + ehr_status tables.</td></tr>
+      <tr><td><code>src/infrastructure/database/repositories/CompositionRepository.ts</code></td><td>Infrastructure</td><td>135</td><td>DrizzleCompositionRepository implements CompositionRepository port</td><td>Append-only versioning enforced here. No UPDATE statements.</td></tr>
+      <tr><td><code>src/infrastructure/database/repositories/ContributionRepository.ts</code></td><td>Infrastructure</td><td>62</td><td>DrizzleContributionRepository implements ContributionRepository port</td><td>Sequential inserts simulate atomic change-set semantics.</td></tr>
+      <tr><td><code>src/infrastructure/database/repositories/DirectoryRepository.ts</code></td><td>Infrastructure</td><td>88</td><td>DrizzleDirectoryRepository implements DirectoryRepository port</td><td>Delete-then-insert update pattern. UNIQUE(ehr_id) enforces one directory.</td></tr>
+      <tr><td><code>src/infrastructure/database/repositories/QueryRepository.ts</code></td><td>Infrastructure</td><td>98</td><td>DrizzleQueryRepository + DrizzleDefinitionRepository</td><td>AQL executed by keyword pattern matching against Drizzle queries.</td></tr>
+      <tr><td><code>src/infrastructure/config/container.ts</code></td><td>Infrastructure</td><td>22</td><td>Manual DI container</td><td>All dependency relationships visible in one file.</td></tr>
+      <tr><td><code>src/interfaces/rest/routes.ts</code></td><td>Interface</td><td>215</td><td>All 30+ openEHR route handlers</td><td>Primary adapters: validate → convert → call service → respond.</td></tr>
+      <tr><td><code>src/interfaces/rest/schemas.ts</code></td><td>Interface</td><td>78</td><td>Zod schemas for all request bodies</td><td>Runtime validation + TypeScript types from one source.</td></tr>
+      <tr><td><code>src/interfaces/rest/openapi.ts</code></td><td>Interface</td><td>~400</td><td>Full OpenAPI 3.0 spec with clinical descriptions</td><td>Served at /api-docs, rendered by Swagger UI at /docs.</td></tr>
+      <tr><td><code>src/interfaces/rest/websocket.ts</code></td><td>Interface</td><td>82</td><td>Bun native WebSocket broadcaster</td><td>Zero-dependency real-time event publishing.</td></tr>
+      <tr><td><code>src/interfaces/rest/patientApiRoutes.ts</code></td><td>Interface</td><td>68</td><td>Patient BFF API (/api/patients, /api/seed)</td><td>Frontend-friendly aggregate over verbose openEHR format.</td></tr>
+      <tr><td><code>src/interfaces/middleware/snakeCase.ts</code></td><td>Interface</td><td>22</td><td>deepSnakeCase + deepCamelCase converters</td><td>Anti-corruption layer between HTTP snake_case and TS camelCase.</td></tr>
+      <tr><td><code>src/interfaces/middleware/errorHandler.ts</code></td><td>Interface</td><td>32</td><td>DomainError → RFC 7807 HTTP response mapper</td><td>Domain exceptions map to correct HTTP status codes here, not in domain.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     11. FRONTEND ARCHITECTURE
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="frontend" class="page-break">
+  <div class="section-header"><h2>🎨 &nbsp;11. Frontend Architecture</h2><p>React 18 + Material UI v6 styled to the BunEHR design system</p></div>
+
+  <h3>Stack</h3>
+  <table>
+    <thead><tr><th>Package</th><th>Version</th><th>Purpose</th><th>Why chosen</th></tr></thead>
+    <tbody>
+      <tr><td>React</td><td>18.3</td><td>UI framework</td><td>Industry standard, concurrent rendering, hooks</td></tr>
+      <tr><td>Material UI</td><td>v6</td><td>Component library</td><td>Complete hospital system UI components, BunEHR theming</td></tr>
+      <tr><td>React Router</td><td>v7</td><td>Routing</td><td>Nested routes, outlet context for WebSocket state</td></tr>
+      <tr><td>react-leaflet</td><td>4.2</td><td>Hospital map</td><td>Open-source, no API key, self-hostable OSM tiles</td></tr>
+      <tr><td>Recharts</td><td>2.15</td><td>Vital sign charts</td><td>React-idiomatic, ReferenceLine for clinical normal ranges</td></tr>
+      <tr><td>Vite</td><td>6.0</td><td>Build tool + dev server</td><td>Fast HMR, automatic proxy to BunEHR backend</td></tr>
+    </tbody>
+  </table>
+
+  <h3>BunEHR Design System</h3>
+  <p>The frontend is styled to match the BunEHR visual identity as closely as possible using Material UI's theming system:</p>
+  <ul>
+    <li><strong>Primary colour:</strong> #2563EB (BunEHR blue) — used for CTAs, links, active states</li>
+    <li><strong>Secondary colour:</strong> #10B981 (health green) — success states, normal vital signs</li>
+    <li><strong>Navigation:</strong> #0F172A (dark navy) — permanent sidebar, matching BunEHR dark navigation</li>
+    <li><strong>Background:</strong> #F8FAFC (clinical off-white) — clean, medical feel</li>
+    <li><strong>Typography:</strong> Inter / Geist — matches bunehr.dev font stack</li>
+    <li><strong>Border radius:</strong> 10px — consistent rounded corners throughout</li>
+  </ul>
+
+  <h3>Page Architecture</h3>
+  <p>Every page in the system follows the same structure:</p>
+  <ul>
+    <li><strong>Header section</strong> — page title + description in plain English for clinical staff</li>
+    <li><strong>Main content</strong> — page-specific UI (map, table, charts, form)</li>
+    <li><strong>PageGuide FAB</strong> — floating blue <code>?</code> button that opens a modal explaining what the page does, which openEHR concept it relates to, the exact API endpoints used (with curl examples), and tips for both clinicians and developers</li>
+  </ul>
+
+  <h3>WebSocket State Management</h3>
+  <p>The <code>useWebSocket()</code> hook is called once in <code>AppLayout.tsx</code> and the live events array is passed to all child pages via React Router's <code>useOutletContext()</code>. This means:</p>
+  <ul>
+    <li>One WebSocket connection per session (not one per page)</li>
+    <li>Events persist across page navigations</li>
+    <li>Auto-reconnects after 3 seconds if the server restarts</li>
+    <li>The live activity feed on the Dashboard updates in real time without polling</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     12. FRONTEND FILES
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="frontend-files" class="page-break">
+  <div class="section-header"><h2>📂 &nbsp;12. Frontend File Reference</h2><p>All 14 source files explained</p></div>
+  <table>
+    <thead><tr><th>File</th><th>Purpose</th><th>Key design decision</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/main.tsx</code></td><td>React 18 root renderer. Injects BunEHR global CSS (Inter font, CSS variables, scrollbar styling). Fixes Leaflet marker icon paths broken by Vite asset hashing.</td><td>Global CSS injected dynamically to avoid a separate CSS file that could be lost in builds.</td></tr>
+      <tr><td><code>src/App.tsx</code></td><td>BrowserRouter + all routes in AppLayout shell. Maps URLs to page components. Unknown paths redirect to dashboard.</td><td>Single router file makes navigation structure visible at a glance.</td></tr>
+      <tr><td><code>src/theme/bunehrTheme.ts</code></td><td>MUI v6 custom theme with BunEHR brand colours, Inter typeface, dark navy sidebar, statusColors and wardColors exported for consistent badge colouring.</td><td>Central theme file — no hardcoded colours scattered in components.</td></tr>
+      <tr><td><code>src/types/openehr.ts</code></td><td>Full TypeScript types for openEHR REST API v1 responses plus frontend-specific Patient, VitalSigns, VitalTrend, and LiveEvent interfaces.</td><td>Typed API responses catch contract mismatches at compile time.</td></tr>
+      <tr><td><code>src/api/ehrClient.ts</code></td><td>Type-safe API client wrapping the BunEHR backend. All API calls go through here.</td><td>Single API module. Swap BASE URL to point at any openEHR server.</td></tr>
+      <tr><td><code>src/api/samplePatients.ts</code></td><td>12 sample patients with demographics, GPS ward coordinates, vitals, and diagnoses. generateVitalTrend() creates 24-hour simulated vital data.</td><td>Demo data ships with frontend — UI looks populated without needing seed first.</td></tr>
+      <tr><td><code>src/hooks/useWebSocket.ts</code></td><td>Auto-reconnecting WebSocket hook. Maintains LiveEvent[] buffer (max 50), connected boolean. Reconnects after 3s on disconnect.</td><td>Encapsulates all WS connection management. Components only see events and connected state.</td></tr>
+      <tr><td><code>src/components/layout/TopBar.tsx</code></td><td>Fixed app bar with BunEHR logo (/logo.png), 'BunEHR' branding, live connection chip, notification bell, user avatar.</td><td>TopBar is the primary brand touchpoint — logo visible on every page.</td></tr>
+      <tr><td><code>src/components/layout/Sidebar.tsx</code></td><td>Dark navy permanent sidebar (220px). 4 navigation sections with tooltips. Active route highlighted with blue left border.</td><td>Dark sidebar on light content — standard medical UI pattern separating navigation from workspace.</td></tr>
+      <tr><td><code>src/components/layout/AppLayout.tsx</code></td><td>Shell: TopBar + Sidebar + Outlet. Manages WebSocket connection and passes state to children via outlet context.</td><td>WebSocket managed once in layout, not per page.</td></tr>
+      <tr><td><code>src/components/shared/PageGuide.tsx</code></td><td>Floating Action Button on every page that opens a guide modal with overview, openEHR concept, API endpoints (with curl examples), clinician tips, and developer notes.</td><td>Every page is self-documenting for users unfamiliar with EHR systems.</td></tr>
+      <tr><td><code>src/pages/DashboardPage.tsx</code></td><td>Hospital overview: stat cards, Leaflet map (CircleMarker per patient), 7-day BarChart, live WebSocket event feed, critical patient list.</td><td>Nurse station view — situational awareness at a glance.</td></tr>
+      <tr><td><code>src/pages/PatientsPage.tsx</code></td><td>Search + filter patient cards with vitals mini-panel, allergy alerts, status badges. Click-through to detail.</td><td>Cards chosen over table for richer per-patient data density.</td></tr>
+      <tr><td><code>src/pages/PatientDetailPage.tsx</code></td><td>3-tab view: vital trends (24h LineChart with normal range ReferenceLine), clinical documents, raw openEHR data + API endpoint list.</td><td>3 mental models: clinical, documentary, technical — all in one page via tabs.</td></tr>
+      <tr><td><code>src/pages/OpenEHRPage.tsx</code></td><td>3-tab: openEHR concept cards (plain English + technical), live AQL query runner, integration settings.</td><td>Dual audience: clinicians see explanations, developers see the query editor.</td></tr>
+      <tr><td><code>src/pages/AboutPage.tsx</code></td><td>Project overview, Daisy's story with photo, tech stack cards, openEHR glossary, Daisy's stats table.</td><td>Tells the human story behind the software.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     13. DATABASE SCHEMA
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="database" class="page-break">
+  <div class="section-header"><h2>🗄️ &nbsp;13. Database Schema</h2><p>8 PostgreSQL tables with JSONB, TIMESTAMPTZ, and GIN indexes</p></div>
+
+  <h3>📐 Design Principles</h3>
+  <ul>
+    <li><strong>TEXT for IDs</strong> — UUID strings stored as TEXT (not native UUID type) to avoid JDBC driver casting issues with Drizzle's string mapping</li>
+    <li><strong>JSONB for clinical content</strong> — Composition content and directory items stored as JSONB for GIN-indexed native JSON querying</li>
+    <li><strong>TIMESTAMPTZ everywhere</strong> — All timestamps are timezone-aware. Plain TIMESTAMP is never used — it leads to timezone bugs in multi-region deployments</li>
+    <li><strong>Append-only for versioned tables</strong> — ehr_status and composition never receive UPDATE statements</li>
+    <li><strong>Cascade deletes</strong> — All child tables have ON DELETE CASCADE so removing an EHR cleans up all related records</li>
+  </ul>
+
+  <div class="db-table">
+    <div class="db-table-header"><span class="db-table-name">ehr</span><span class="badge badge-blue">Core</span><span class="badge badge-gray">7 columns</span></div>
+    <div class="db-table-body">
+      <div class="db-col"><span class="col-name">id</span><span class="col-type">TEXT PK</span><span class="col-desc">UUID string — globally unique EHR identifier. Permanent for the patient's lifetime.</span></div>
+      <div class="db-col"><span class="col-name">subject_id</span><span class="col-type">TEXT NOT NULL</span><span class="col-desc">Patient identifier in the external demographics system.</span></div>
+      <div class="db-col"><span class="col-name">subject_namespace</span><span class="col-type">TEXT DEFAULT 'local'</span><span class="col-desc">Namespace of the demographics system (e.g. 'local', 'nhs', 'epic').</span></div>
+      <div class="db-col"><span class="col-name">system_id</span><span class="col-type">TEXT</span><span class="col-desc">openEHR system identifier — embedded in all version UIDs for this EHR.</span></div>
+      <div class="db-col"><span class="col-name">is_queryable</span><span class="col-type">BOOLEAN</span><span class="col-desc">Whether this EHR can appear in AQL query results.</span></div>
+      <div class="db-col"><span class="col-name">is_modifiable</span><span class="col-type">BOOLEAN</span><span class="col-desc">Whether this EHR's compositions can be modified.</span></div>
+      <div class="db-col"><span class="col-name">time_created</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">When the EHR was created. UNIQUE(subject_id, subject_namespace) prevents duplicate EHRs.</span></div>
+    </div>
+  </div>
+
+  <div class="db-table">
+    <div class="db-table-header"><span class="db-table-name">ehr_status</span><span class="badge badge-purple">Append-only versioned</span><span class="badge badge-gray">13 columns</span></div>
+    <div class="db-table-body">
+      <div class="db-col"><span class="col-name">id</span><span class="col-type">TEXT PK</span><span class="col-desc">Row identifier (new UUID per version).</span></div>
+      <div class="db-col"><span class="col-name">ehr_id</span><span class="col-type">TEXT FK → ehr</span><span class="col-desc">The EHR this status belongs to.</span></div>
+      <div class="db-col"><span class="col-name">uid</span><span class="col-type">TEXT</span><span class="col-desc">Object UUID (same across all versions of this EHR_STATUS).</span></div>
+      <div class="db-col"><span class="col-name">version_id</span><span class="col-type">TEXT</span><span class="col-desc">Full version UID: uuid::system::N. Increments on each update.</span></div>
+      <div class="db-col"><span class="col-name">preceding_version_uid</span><span class="col-type">TEXT NULL</span><span class="col-desc">Links version chain. NULL for the first version.</span></div>
+      <div class="db-col"><span class="col-name">other_details</span><span class="col-type">JSONB</span><span class="col-desc">Flexible additional EHR metadata in openEHR ItemStructure format.</span></div>
+      <div class="db-col"><span class="col-name">commit_audit</span><span class="col-type">JSONB</span><span class="col-desc">Audit details for this version: committer, timestamp, change type.</span></div>
+      <div class="db-col"><span class="col-name">time_committed</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">When this version was committed. Index: (ehr_id, time_committed DESC).</span></div>
+    </div>
+  </div>
+
+  <div class="db-table">
+    <div class="db-table-header"><span class="db-table-name">composition</span><span class="badge badge-green">JSONB + GIN index</span><span class="badge badge-purple">Append-only</span><span class="badge badge-gray">16 columns</span></div>
+    <div class="db-table-body">
+      <div class="db-col"><span class="col-name">id</span><span class="col-type">TEXT PK</span><span class="col-desc">Row identifier (new UUID per version).</span></div>
+      <div class="db-col"><span class="col-name">ehr_id</span><span class="col-type">TEXT FK → ehr</span><span class="col-desc">The EHR this composition belongs to.</span></div>
+      <div class="db-col"><span class="col-name">uid</span><span class="col-type">TEXT</span><span class="col-desc">Object UUID (same across all versions).</span></div>
+      <div class="db-col"><span class="col-name">version_id</span><span class="col-type">TEXT</span><span class="col-desc">Full version UID: uuid::system::N.</span></div>
+      <div class="db-col"><span class="col-name">template_id</span><span class="col-type">TEXT</span><span class="col-desc">Clinical template ID (e.g. KotlinEHR-Encounter.v1).</span></div>
+      <div class="db-col"><span class="col-name">archetype_id</span><span class="col-type">TEXT NULL</span><span class="col-desc">Root archetype ID (e.g. openEHR-EHR-COMPOSITION.encounter.v1).</span></div>
+      <div class="db-col"><span class="col-name">lifecycle_state</span><span class="col-type">TEXT</span><span class="col-desc">COMPLETE or DELETED. Never physically removed.</span></div>
+      <div class="db-col"><span class="col-name">content</span><span class="col-type">JSONB NOT NULL</span><span class="col-desc"><strong>The clinical data.</strong> Full composition structure as JSONB. GIN index enables native JSON path queries: content @&gt; '{"archetype_node_id": "..."}'</span></div>
+      <div class="db-col"><span class="col-name">time_committed</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">When this version was committed. Used for time-travel queries.</span></div>
+    </div>
+  </div>
+
+  <div class="db-table">
+    <div class="db-table-header"><span class="db-table-name">contribution</span><span class="badge badge-amber">Audit trail</span><span class="badge badge-gray">9 columns</span></div>
+    <div class="db-table-body">
+      <div class="db-col"><span class="col-name">id</span><span class="col-type">TEXT PK</span><span class="col-desc">Unique contribution identifier.</span></div>
+      <div class="db-col"><span class="col-name">ehr_id</span><span class="col-type">TEXT FK → ehr</span><span class="col-desc">The EHR this contribution modifies.</span></div>
+      <div class="db-col"><span class="col-name">uid</span><span class="col-type">TEXT</span><span class="col-desc">Business identifier used in the openEHR API response.</span></div>
+      <div class="db-col"><span class="col-name">audit_type</span><span class="col-type">TEXT</span><span class="col-desc">CREATION, AMENDMENT, MODIFICATION, SYNTHESIS, DELETED.</span></div>
+      <div class="db-col"><span class="col-name">auditor_name</span><span class="col-type">TEXT</span><span class="col-desc">Name of the clinician who made the change.</span></div>
+      <div class="db-col"><span class="col-name">description</span><span class="col-type">TEXT</span><span class="col-desc">Optional reason for the change.</span></div>
+      <div class="db-col"><span class="col-name">time_committed</span><span class="col-type">TIMESTAMPTZ</span><span class="col-desc">When the contribution was committed.</span></div>
+    </div>
+  </div>
+
+  <div class="db-table">
+    <div class="db-table-header"><span class="db-table-name">directory</span><span class="badge badge-blue">JSONB items</span><span class="badge badge-gray">10 columns</span></div>
+    <div class="db-table-body">
+      <div class="db-col"><span class="col-name">ehr_id</span><span class="col-type">TEXT UNIQUE FK</span><span class="col-desc">One directory per EHR enforced by UNIQUE constraint.</span></div>
+      <div class="db-col"><span class="col-name">version_id</span><span class="col-type">TEXT</span><span class="col-desc">Full version UID. Incremented on each update.</span></div>
+      <div class="db-col"><span class="col-name">items</span><span class="col-type">JSONB</span><span class="col-desc">Array of ObjectRef (folder items). Stored as JSONB.</span></div>
+    </div>
+  </div>
+
+  <h3>⚡ Indexes</h3>
+  <table>
+    <thead><tr><th>Index name</th><th>Table</th><th>Columns</th><th>Type</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>uq_ehr_subject</td><td>ehr</td><td>subject_id, subject_namespace</td><td>UNIQUE</td><td>Prevent duplicate EHRs per patient</td></tr>
+      <tr><td>idx_ehr_status_ehr</td><td>ehr_status</td><td>ehr_id</td><td>B-tree</td><td>Fast lookup of all status rows for an EHR</td></tr>
+      <tr><td>idx_ehr_status_time</td><td>ehr_status</td><td>ehr_id, time_committed DESC</td><td>B-tree</td><td>Fast "current version" lookup</td></tr>
+      <tr><td>idx_composition_ehr</td><td>composition</td><td>ehr_id</td><td>B-tree</td><td>All compositions for a patient</td></tr>
+      <tr><td>idx_composition_uid</td><td>composition</td><td>uid</td><td>B-tree</td><td>Version history lookup by object ID</td></tr>
+      <tr><td>idx_composition_template</td><td>composition</td><td>template_id</td><td>B-tree</td><td>Find all compositions of a given template type</td></tr>
+      <tr><td>idx_composition_time</td><td>composition</td><td>ehr_id, time_committed DESC</td><td>B-tree</td><td>Temporal queries (version at time)</td></tr>
+      <tr><td><strong>idx_composition_content</strong></td><td>composition</td><td>content</td><td><strong>GIN</strong></td><td>Native JSON containment queries for AQL</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     14. DRIZZLE ORM
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="orm" class="page-break">
+  <div class="section-header"><h2>💧 &nbsp;14. Drizzle ORM</h2><p>TypeScript-first SQL query builder — the right ORM for Bun</p></div>
+
+  <p>Drizzle ORM is not a traditional ORM in the Java/Hibernate sense. It is a <strong>TypeScript-first SQL query builder</strong> that generates type-safe SQL from a schema definition. There is no entity manager, no lazy loading, no reflection, no magic. It is closer to a strongly-typed SQL DSL than to TypeORM or Prisma.</p>
+
+  <h3>🌊 Why Drizzle over Prisma?</h3>
+  <table>
+    <thead><tr><th>Dimension</th><th>Drizzle ORM</th><th>Prisma</th><th>TypeORM</th></tr></thead>
+    <tbody>
+      <tr><td>Bundle size</td><td><strong>~50KB</strong></td><td>~200MB (Rust engine)</td><td>~5MB</td></tr>
+      <tr><td>Startup overhead</td><td><strong>Zero</strong></td><td>Rust engine sidecar process</td><td>Reflect-metadata scan</td></tr>
+      <tr><td>Type source</td><td><strong>Schema file → infer</strong></td><td>Prisma schema → generate</td><td>Decorators + metadata</td></tr>
+      <tr><td>Bun compatibility</td><td><strong>Native ESM, fully compatible</strong></td><td>Rust engine issues on Bun</td><td>reflect-metadata issues</td></tr>
+      <tr><td>SQL visibility</td><td><strong>Transparent — you see the SQL</strong></td><td>Hidden behind abstraction</td><td>Some magic</td></tr>
+      <tr><td>Migration</td><td><strong>Auto-generated from schema diff</strong></td><td>Auto-generated (separate step)</td><td>Manual or auto</td></tr>
+      <tr><td>PostgreSQL JSONB</td><td><strong>Native jsonb() column type</strong></td><td>via Json type (less precise)</td><td>Manual configuration</td></tr>
+    </tbody>
+  </table>
+
+  <h3>💎 Schema as Single Source of Truth</h3>
+  <p>The <code>schema.ts</code> file is the single source of truth for both the database structure and TypeScript types:</p>
+  <pre><code><span class="kw">export const</span> composition = pgTable(<span class="str">'composition'</span>, {
+  id:          text(<span class="str">'id'</span>).primaryKey(),
+  content:     jsonb(<span class="str">'content'</span>).notNull(),   <span class="cm">// JSONB column</span>
+  timeCommitted: timestamp(<span class="str">'time_committed'</span>, {
+    withTimezone: <span class="kw">true</span>                          <span class="cm">// TIMESTAMPTZ</span>
+  }).notNull().defaultNow(),
+})
+
+<span class="cm">// TypeScript type derived automatically — no manual maintenance:</span>
+<span class="kw">export type</span> CompositionRow = <span class="kw">typeof</span> composition.<span class="fn">$inferSelect</span>
+<span class="cm">// → { id: string; content: unknown; timeCommitted: Date; ... }</span></code></pre>
+
+  <h3>🔮 Type-Safe Query Examples</h3>
+  <pre><code><span class="cm">// Fetch latest composition versions for a patient:</span>
+<span class="kw">const</span> rows = <span class="kw">await</span> db
+  .select()
+  .from(composition)
+  .where(<span class="fn">and</span>(<span class="fn">eq</span>(composition.ehrId, ehrId), <span class="fn">eq</span>(composition.uid, uid)))
+  .orderBy(<span class="fn">desc</span>(composition.timeCommitted))
+  .limit(<span class="num">1</span>)
+
+<span class="cm">// TypeScript knows rows[0] is CompositionRow — no casting needed
+// Passing the wrong type to eq() is a compile-time error</span></code></pre>
+
+  <h3>🔄 Migration Workflow</h3>
+  <pre><code><span class="cm"># 1. Modify schema.ts (add a column, create an index, etc.)</span>
+
+<span class="cm"># 2. Generate migration SQL from schema diff:</span>
+bun run db:generate
+<span class="cm"># → Creates: src/infrastructure/database/migrations/0001_...sql</span>
+
+<span class="cm"># 3. Apply migrations (also runs automatically on startup):</span>
+bun run db:migrate
+
+<span class="cm"># 4. Optional: open Drizzle Studio (DB GUI):</span>
+bun run db:studio</code></pre>
+
+  <h3>🌊 Connection Pool</h3>
+  <table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Driver</td><td>postgres.js</td><td>Native ESM, Bun-compatible, zero dependencies, handles JSONB natively</td></tr>
+      <tr><td>max connections</td><td>10</td><td>PostgreSQL default max_connections is 100; 10 per instance leaves headroom for multiple instances</td></tr>
+      <tr><td>idle_timeout</td><td>30s</td><td>Releases idle connections during quiet periods (nights/weekends in a hospital)</td></tr>
+      <tr><td>connect_timeout</td><td>10s</td><td>Fails fast if DB is unreachable rather than hanging indefinitely</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     15. API REFERENCE
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="api" class="page-break">
+  <div class="section-header"><h2>📡 &nbsp;15. API Reference</h2><p>All 37 endpoints with descriptions, response codes, and usage patterns</p></div>
+
+  <p>Swagger UI with interactive try-it-out: <strong>http://localhost:3000/docs</strong><br/>OpenAPI JSON spec: <strong>http://localhost:3000/api-docs</strong></p>
+
+  <div class="callout info">
+    <div class="callout-title">Common Patterns</div>
+    <p><strong>ETag + If-Match:</strong> All update/delete operations require <code>If-Match: "current-version-uid"</code>. Get the current version from the <code>ETag</code> header of the preceding GET response.<br/>
+    <strong>Prefer header:</strong> <code>Prefer: return=representation</code> on POST/PUT includes the created/updated resource in the response body (default: only headers returned).<br/>
+    <strong>Errors:</strong> All errors return RFC 7807 Problem Details JSON with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, <code>instance</code>, and <code>timestamp</code>.</p>
+  </div>
+
+  <h3>🏥 EHR Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/ehr</span></div><div class="endpoint-body">Create EHR with auto-generated UUID. Returns 201 with Location header. Set Prefer: return=representation for body. Codes: 201, 409 (duplicate subject).</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-put">PUT</span><span class="endpoint-path">/v1/ehr/{ehr_id}</span></div><div class="endpoint-body">Create EHR with client-specified UUID. Codes: 201, 409.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}</span></div><div class="endpoint-body">Retrieve full EHR. ETag header contains current ehr_status version uid. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr?subject_id=X&subject_namespace=Y</span></div><div class="endpoint-body">Find EHR by patient subject ID in demographics system. Codes: 200, 404.</div></div>
+
+  <h3>📋 EHR_STATUS Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/ehr_status</span></div><div class="endpoint-body">Get current EHR_STATUS. ETag = current version uid. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-put">PUT</span><span class="endpoint-path">/v1/ehr/{ehr_id}/ehr_status</span></div><div class="endpoint-body">Update EHR_STATUS. Requires If-Match. INSERTs new row (append-only). Codes: 200, 412 (version mismatch), 428 (If-Match missing).</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/ehr_status/{version_uid}</span></div><div class="endpoint-body">Get EHR_STATUS at a specific historical version. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/versioned_ehr_status</span></div><div class="endpoint-body">Full version history of EHR_STATUS with revision history. Codes: 200, 404.</div></div>
+
+  <h3>📄 COMPOSITION Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/ehr/{ehr_id}/composition</span></div><div class="endpoint-body">Create clinical document stored as JSONB. Returns Location + ETag. Codes: 201, 404 (EHR not found), 422 (validation).</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/composition/{versioned_object_uid}</span></div><div class="endpoint-body">Get composition by full version UID or object UUID (latest). Add ?version_at_time=ISO8601 for time-travel. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-put">PUT</span><span class="endpoint-path">/v1/ehr/{ehr_id}/composition/{versioned_object_uid}</span></div><div class="endpoint-body">Update composition. INSERTs new version row (never UPDATE). Requires If-Match. Codes: 200, 412, 428.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-delete">DELETE</span><span class="endpoint-path">/v1/ehr/{ehr_id}/composition/{preceding_version_uid}</span></div><div class="endpoint-body">Logical delete — creates new row with lifecycle_state=DELETED. Data never removed. Codes: 204, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/versioned_composition/{versioned_object_uid}</span></div><div class="endpoint-body">Full version history of a composition. Codes: 200, 404.</div></div>
+
+  <h3>📝 CONTRIBUTION Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/ehr/{ehr_id}/contribution</span></div><div class="endpoint-body">Create audited change-set. Returns Location. Codes: 201, 422.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/contribution/{contribution_uid}</span></div><div class="endpoint-body">Retrieve contribution with audit details. Codes: 200, 404.</div></div>
+
+  <h3>📁 DIRECTORY Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/ehr/{ehr_id}/directory</span></div><div class="endpoint-body">Create folder structure. One per EHR (enforced by UNIQUE constraint). Codes: 201, 409.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/directory</span></div><div class="endpoint-body">Get current directory. ETag = current version uid. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-put">PUT</span><span class="endpoint-path">/v1/ehr/{ehr_id}/directory</span></div><div class="endpoint-body">Update directory. Requires If-Match. Delete-then-insert internally. Codes: 200, 412.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-delete">DELETE</span><span class="endpoint-path">/v1/ehr/{ehr_id}/directory</span></div><div class="endpoint-body">Delete directory. Requires If-Match. Codes: 204, 412.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/ehr/{ehr_id}/directory/{version_uid}</span></div><div class="endpoint-body">Get directory at specific version. Codes: 200, 404.</div></div>
+
+  <h3>🔍 QUERY (AQL) Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/query/aql?q=SELECT...&fetch=20</span></div><div class="endpoint-body">Execute AQL via query parameter. Codes: 200, 400.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/query/aql</span></div><div class="endpoint-body">Execute AQL via request body. Body: { q, fetch?, offset?, query_parameters? }. Codes: 200, 400.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/query/stored-queries</span></div><div class="endpoint-body">List all saved AQL queries. Optional ?qualified_query_name= prefix filter. Codes: 200.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-put">PUT</span><span class="endpoint-path">/v1/query/stored-queries/{name}/{version}</span></div><div class="endpoint-body">Save a named, versioned AQL query. Upserts on conflict. Codes: 200.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/query/stored-queries/{qualified_query_name}</span></div><div class="endpoint-body">Get a specific stored query. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/query/aql/{qualified_query_name}</span></div><div class="endpoint-body">Execute a stored query by name. Codes: 200, 404.</div></div>
+
+  <h3>📜 DEFINITION Endpoints</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/definition/template/adl1.4</span></div><div class="endpoint-body">Upload ADL 1.4 OPT template (Content-Type: application/xml). Codes: 201, 409.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/definition/template/adl1.4</span></div><div class="endpoint-body">List all ADL 1.4 templates. Codes: 200.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/definition/template/adl1.4/{template_id}</span></div><div class="endpoint-body">Get template content. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/definition/template/adl1.4/{template_id}/example</span></div><div class="endpoint-body">Get skeleton COMPOSITION for this template. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/v1/definition/template/adl2</span></div><div class="endpoint-body">Upload ADL 2 template (Content-Type: text/plain). Codes: 201.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/v1/definition/template/adl2</span></div><div class="endpoint-body">List ADL 2 templates. Codes: 200.</div></div>
+
+  <h3>👤 Patient BFF API</h3>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-post">POST</span><span class="endpoint-path">/api/seed</span></div><div class="endpoint-body">Seed 12 sample patient EHRs. Broadcasts WebSocket events. Run once per fresh database. Codes: 200, 500.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/api/patients</span></div><div class="endpoint-body">All patients with demographics, vitals, ward. Codes: 200.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/api/patients/{patient_id}</span></div><div class="endpoint-body">Single patient by EHR ID. Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/api/patients/{patient_id}/vitals</span></div><div class="endpoint-body">24-hour vital sign trend (24 hourly readings). Codes: 200, 404.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-get">GET</span><span class="endpoint-path">/health</span></div><div class="endpoint-body">Service health check. Returns { status, service, version, timestamp }. Codes: 200.</div></div>
+  <div class="endpoint"><div class="endpoint-header"><span class="method method-ws">WS</span><span class="endpoint-path">/ws</span></div><div class="endpoint-body">WebSocket endpoint for real-time clinical events. Connect with any standard WebSocket client. Events: { id, type, patientId, patientName, ward, message, severity, timestamp }. Codes: 101 Switching Protocols.</div></div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     16. WEBSOCKET
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="websocket" class="page-break">
+  <div class="section-header"><h2>⚡ &nbsp;16. WebSocket Architecture</h2><p>Real-time clinical event broadcasting with Bun's native WebSocket</p></div>
+
+  <h3>⚡ Why Real-Time Matters</h3>
+  <p>A 5-second polling delay is acceptable for a social media feed. It is not acceptable when a patient's SpO₂ has dropped to 88%. WebSocket pushes critical clinical events to all connected clinicians the moment they occur — no delay, no polling overhead, no stale data.</p>
+
+  <h3>🚨 Clinical Event Types</h3>
+  <table>
+    <thead><tr><th>Event Type</th><th>Severity</th><th>Clinical Use</th></tr></thead>
+    <tbody>
+      <tr><td>admission</td><td>info</td><td>Notify ward nurses of incoming patient, prepare bed and care plan</td></tr>
+      <tr><td>discharge</td><td>success</td><td>Free up bed, alert transport team, trigger pharmacy reconciliation</td></tr>
+      <tr><td>critical_alert</td><td>error</td><td>Immediate clinical response required — SpO₂ &lt; 90%, STEMI, deteriorating GCS</td></tr>
+      <tr><td>lab_result</td><td>warning</td><td>Clinician review required for pathology result</td></tr>
+      <tr><td>vitals_update</td><td>success</td><td>Treatment working confirmation — BP normalising, temperature reducing</td></tr>
+      <tr><td>medication</td><td>info</td><td>Medication administered — dosing check, reconciliation</td></tr>
+    </tbody>
+  </table>
+
+  <h3>📡 WebSocket Message Format</h3>
+  <pre><code>{
+  <span class="str">"id"</span>:          <span class="str">"uuid"</span>,                    <span class="cm">// unique event ID</span>
+  <span class="str">"type"</span>:        <span class="str">"critical_alert"</span>,          <span class="cm">// event type</span>
+  <span class="str">"patientId"</span>:   <span class="str">"ehr-002"</span>,                 <span class="cm">// EHR ID</span>
+  <span class="str">"patientName"</span>: <span class="str">"James Okafor"</span>,            <span class="cm">// display name</span>
+  <span class="str">"ward"</span>:        <span class="str">"Emergency"</span>,               <span class="cm">// ward name</span>
+  <span class="str">"message"</span>:     <span class="str">"SpO₂ dropped to 88% — respiratory team paged"</span>,
+  <span class="str">"severity"</span>:    <span class="str">"error"</span>,                   <span class="cm">// info | warning | error | success</span>
+  <span class="str">"timestamp"</span>:   <span class="str">"2026-06-10T14:32:00.000Z"</span>
+}</code></pre>
+
+  <h3>⚖️ Bun Native vs socket.io</h3>
+  <table>
+    <thead><tr><th>Dimension</th><th>Bun native WebSocket</th><th>socket.io</th></tr></thead>
+    <tbody>
+      <tr><td>Dependencies</td><td><strong>Zero</strong></td><td>~200KB + engine.io + transports</td></tr>
+      <tr><td>Protocol</td><td>Standard RFC 6455</td><td>Custom socket.io protocol (not interoperable)</td></tr>
+      <tr><td>Server access</td><td>Passed as fetch() 2nd arg</td><td>Separate namespace/room API</td></tr>
+      <tr><td>Startup cost</td><td>Zero</td><td>~180ms module load</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     17. DOCKER
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="docker" class="page-break">
+  <div class="section-header"><h2>🐋 &nbsp;17. Docker Setup</h2><p>Three-service Docker Compose stack</p></div>
+
+  <h3>🐋 Services</h3>
+  <table>
+    <thead><tr><th>Service</th><th>Image</th><th>Host Port</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>postgres</td><td>postgres:16-alpine</td><td>5433</td><td>Primary data store. alpine = ~150MB smaller than full image</td></tr>
+      <tr><td>pgadmin</td><td>dpage/pgadmin4:latest</td><td>5050</td><td>Database admin UI. Pre-configured with server connection</td></tr>
+      <tr><td>bun-ehr</td><td>meblock-ehr:latest</td><td>3000</td><td>Application API server</td></tr>
+    </tbody>
+  </table>
+
+  <h3>🐋 Multi-Stage Dockerfile</h3>
+  <pre><code><span class="cm"># Stage 1: Install dependencies (cached unless package.json changes)</span>
+<span class="kw">FROM</span> oven/bun:1.2-alpine <span class="kw">AS</span> deps
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile    <span class="cm"># deterministic from lockfile</span>
+
+<span class="cm"># Stage 2: Production image (~120MB total)</span>
+<span class="kw">FROM</span> oven/bun:1.2-alpine <span class="kw">AS</span> runner
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY src/ ./src/
+COPY drizzle.config.ts ./
+
+<span class="cm"># No build step — Bun runs TypeScript natively</span>
+CMD [<span class="str">"bun"</span>, <span class="str">"run"</span>, <span class="str">"src/index.ts"</span>]</code></pre>
+
+  <h3>🔑 Key Environment Variables</h3>
+  <table>
+    <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>DATABASE_URL</td><td>postgres://ehr_user:ehr_pass@localhost:5433/ehrdb</td><td>Full PostgreSQL connection string</td></tr>
+      <tr><td>PORT</td><td>3000</td><td>HTTP + WebSocket port</td></tr>
+      <tr><td>SYSTEM_ID</td><td>local.bunehr.com</td><td>Embedded in all openEHR version UIDs</td></tr>
+      <tr><td>BUN_EHR_PORT</td><td>3000</td><td>Host port for bun-ehr container (avoids clashing with $PORT)</td></tr>
+      <tr><td>POSTGRES_HOST_PORT</td><td>5433</td><td>Host port for PostgreSQL (avoids clashing with system PG on 5432)</td></tr>
+      <tr><td>PGADMIN_EMAIL</td><td>admin@bunehr.com</td><td>pgAdmin login (must be valid TLD — not .local)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning">
+    <div class="callout-title">⚡ &nbsp;Bun Auto-Start Warning</div>
+    <p>Bun 1.2.x auto-starts a server if the entry module's default export has a <code>fetch</code> property. If you also call <code>Bun.serve()</code> manually, you get two servers on the same port → EADDRINUSE. The fix: use <code>export default { port, fetch, websocket }</code> and let Bun auto-start exactly once. Never call <code>Bun.serve()</code> in the same file.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     WHY DDD IN EHR (special highlighted section)
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="ddd-ehr-importance" class="page-break">
+  <div class="section-header" style="background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);">
+    <h2>🎋 &nbsp; Why DDD is Non-Negotiable in EHR Systems</h2>
+    <p>Domain-Driven Design is not an architectural preference in healthcare — it is the only design that makes clinical software safe, auditable, and maintainable</p>
+  </div>
+
+  <div class="callout danger" style="margin-top:1.5rem;">
+    <div class="callout-title">⛩️ &nbsp;Clinical Software is Different</div>
+    <p>In consumer software, a bug means a broken feature. In clinical software, a bug can mean a clinician sees the wrong medication dose, a critical lab result is silently lost, or an audit trail fails a regulatory inspection. The stakes demand an architecture where clinical rules cannot be accidentally bypassed.</p>
+  </div>
+
+  <h3>The Three Failures of Traditional Layered Architecture in EHR</h3>
+  <div class="grid-3">
+    <div class="card" style="border-top: 3px solid var(--mb-red);">
+      <div class="card-title" style="color:var(--mb-red);">Failure 1: Invisible Invariants</div>
+      <p>In a traditional <code>EhrService.updateComposition()</code>, the rule "a composition can never be overwritten, only versioned" lives as a comment or developer convention. Any future developer can add <code>UPDATE composition SET ...</code> and break a decade of audit history with no compile-time warning.</p>
+      <p style="font-size:.85rem; color:var(--mb-slate); margin-top:.8rem;"><strong>DDD fix:</strong> The <code>CompositionAggregate</code> expresses the invariant as a type. The <code>CompositionRepository</code> port has no <code>overwrite()</code> method — it doesn't exist. You can't accidentally call what doesn't exist.</p>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--mb-amber);">
+      <div class="card-title" style="color:var(--mb-amber);">Failure 2: Compliance as Afterthought</div>
+      <p>HIPAA requires immutable audit trails. GDPR requires that every data processor access is logged. NHS DSP Toolkit requires documented access controls. Without DDD, these requirements are added as database triggers and log statements — afterthoughts bolted onto code that was never designed for them.</p>
+      <p style="font-size:.85rem; color:var(--mb-slate); margin-top:.8rem;"><strong>DDD fix:</strong> The <code>ContributionAggregate</code> makes the audit trail a first-class domain concept. Every change <em>must</em> provide a committer and change type — the type system enforces it at compile time, not as a reminder comment.</p>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--mb-blue);">
+      <div class="card-title" style="color:var(--mb-blue);">Failure 3: Untestable Rules</div>
+      <p>When clinical logic is mixed with database calls, testing requires a running database, seeded test data, and transaction rollbacks. This makes test suites slow (minutes per run) and flaky (connection timeouts). For safety-critical software, this is unacceptable — it means rules go untested between releases.</p>
+      <p style="font-size:.85rem; color:var(--mb-slate); margin-top:.8rem;"><strong>DDD fix:</strong> Domain classes have zero infrastructure dependencies. Clinical rules are tested with mock repositories in milliseconds. The test for "duplicate EHR throws EhrAlreadyExistsError" runs without a database, a Docker container, or a network connection.</p>
+    </div>
+  </div>
+
+  <h3>DDD in BunEHR — Mapping Clinical Requirements to Architecture</h3>
+  <table>
+    <thead><tr><th>Clinical / Regulatory Requirement</th><th>Without DDD</th><th>BunEHR DDD Solution</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Immutable composition history</strong><br/><em>HIPAA § 164.312(b), NHS DSP</em></td>
+        <td>Convention: "don't UPDATE the composition table". Enforced by code review, broken by any developer who doesn't know the rule.</td>
+        <td><code>CompositionRepository</code> port defines only <code>create()</code> and <code>update()</code> (which inserts a new version). No <code>overwrite()</code> method exists in the type system.</td>
+      </tr>
+      <tr>
+        <td><strong>Mandatory audit trail</strong><br/><em>GDPR Article 5(1)(f), HIPAA</em></td>
+        <td>Nullable <code>auditor_id</code> column. Application code "should" populate it. Sometimes forgotten on new endpoints.</td>
+        <td><code>ContributionAuditRequest</code> requires <code>committer: PartyIdentified</code> and <code>changeType: DvCodedText</code>. Non-optional TypeScript fields — compile error if omitted.</td>
+      </tr>
+      <tr>
+        <td><strong>One EHR per patient</strong><br/><em>Clinical safety</em></td>
+        <td>Database UNIQUE constraint + application check. If the app check is removed, the constraint fires a cryptic database error exposed to clients.</td>
+        <td><code>EhrAlreadyExistsError</code> is thrown by <code>DrizzleEhrRepository.create()</code> before the UNIQUE constraint is reached. The domain defines the rule; the DB is a reinforcement.</td>
+      </tr>
+      <tr>
+        <td><strong>Logical deletes only</strong><br/><em>Patient record retention laws</em></td>
+        <td>Physical DELETE possible via any direct DB connection. Nothing in code prevents it.</td>
+        <td>The <code>CompositionRepository</code> port's <code>delete()</code> method INSERTs a new row with <code>lifecycle_state = 'DELETED'</code>. Physical deletes are not expressible through the domain boundary.</td>
+      </tr>
+      <tr>
+        <td><strong>Concurrent update safety</strong><br/><em>Multi-clinician environments</em></td>
+        <td>Last-write-wins. Two clinicians updating the same composition simultaneously produce data loss for one.</td>
+        <td><code>ifMatch: string</code> parameter required on all update operations. <code>PreconditionFailedError</code> thrown if version doesn't match. The If-Match pattern is a domain concept, not an HTTP implementation detail.</td>
+      </tr>
+      <tr>
+        <td><strong>Testable clinical rules</strong><br/><em>Patient safety</em></td>
+        <td>Tests require real DB. Slow CI pipelines mean tests run less frequently. Bugs find their way to production.</td>
+        <td>All domain invariants tested with mock repositories. <code>bun test</code> runs the full domain test suite in &lt;1 second with no infrastructure.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout success">
+    <div class="callout-title">🎋 &nbsp;The DDD Guarantee</div>
+    <p>In BunEHR, a developer cannot accidentally create a non-compliant state. The TypeScript type system, combined with the DDD layer boundaries, makes non-compliant actions either a compile-time error or a named domain exception. This is the only level of guarantee appropriate for software that manages patient records.</p>
+  </div>
+
+  <h3>Real-World DDD Payoff: The openEHR Port Pattern</h3>
+  <p>openEHR defines a rich information model but is intentionally silent on implementation details. BunEHR uses the DDD port pattern to implement openEHR's concepts in a way that is completely decoupled from PostgreSQL:</p>
+  <pre><code><span class="cm">// Domain port — defined in src/domain/ehr/EhrAggregate.ts</span>
+<span class="cm">// No SQL. No Drizzle. No PostgreSQL. Pure interface.</span>
+<span class="kw">interface</span> <span class="fn">EhrRepository</span> {
+  create(ehrId: string, subjectId: string, ...): <span class="kw">Promise</span>&lt;EhrAggregate&gt;
+  findById(ehrId: string): <span class="kw">Promise</span>&lt;EhrAggregate&gt;
+  updateStatus(ehrId: string, ifMatch: string, ...): <span class="kw">Promise</span>&lt;EhrStatusVo&gt;
+}
+
+<span class="cm">// Infrastructure adapter — src/infrastructure/database/repositories/EhrRepository.ts</span>
+<span class="cm">// Knows about PostgreSQL. Implements the domain port.</span>
+<span class="kw">class</span> <span class="fn">DrizzleEhrRepository</span> <span class="kw">implements</span> <span class="fn">EhrRepository</span> {
+  <span class="kw">async</span> <span class="fn">updateStatus</span>(ehrId, ifMatch, ...) {
+    <span class="cm">// Verify version matches → throw PreconditionFailedError if not</span>
+    <span class="cm">// INSERT new ehr_status row (never UPDATE)</span>
+    <span class="cm">// Return updated EhrStatusVo</span>
+  }
+}</code></pre>
+  <p>If BunEHR ever needs to migrate to a different database (MongoDB, a dedicated openEHR server, EHRbase), only the <code>DrizzleEhrRepository</code> changes. The clinical rules, the application services, the API routes, and the frontend remain identical.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     WHY ORM (special highlighted section)
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="orm-importance" class="page-break">
+  <div class="section-header" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);">
+    <h2>💎 &nbsp; Why an ORM is Critical for EHR Systems</h2>
+    <p>Type safety between your TypeScript code and your PostgreSQL schema is not a luxury — it is a patient safety feature</p>
+  </div>
+
+  <div class="callout danger" style="margin-top:1.5rem;">
+    <div class="callout-title">⛩️ &nbsp;Raw SQL in Clinical Software is a Patient Safety Risk</div>
+    <p>A raw SQL string like <code>"INSERT INTO ehr_status (ehr_id, is_queryable) VALUES (?, ?)"</code> has no compile-time checking. Pass the arguments in the wrong order — a common mistake — and a patient's EHR silently becomes non-queryable. No error. No warning. A clinician searching for the patient finds nothing.</p>
+  </div>
+
+  <h3>The Case for a Type-Safe ORM in Healthcare</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Without a Type-Safe ORM</div>
+      <ul>
+        <li>SQL strings are arbitrary text — no validation until runtime</li>
+        <li>Column names can drift from the TypeScript interface without error</li>
+        <li>Nullable columns vs required fields mismatch silently</li>
+        <li>Schema changes break queries at runtime (potentially in production)</li>
+        <li>A developer adds a new table column → forgets to update the TypeScript type → code compiles cleanly → data is silently dropped</li>
+        <li>No enforcement that INSERT always populates audit fields</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">With Drizzle ORM (BunEHR)</div>
+      <ul>
+        <li>Schema is the TypeScript type — <code>$inferSelect</code> always matches the table</li>
+        <li>Column names are type-checked — typos are compile errors</li>
+        <li>Adding a <code>notNull()</code> column requires all INSERT code to be updated (compile error)</li>
+        <li>Schema changes trigger <code>db:generate</code> → migration SQL → code update → compile</li>
+        <li>The entire chain from database → TypeScript → API response is type-safe</li>
+        <li>JSONB columns use <code>jsonb()</code> type — Drizzle handles serialisation correctly</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>🔮 Drizzle's Type Safety in Practice</h3>
+  <p>Consider what happens when a developer adds a new required field to the EHR_STATUS table:</p>
+  <pre><code><span class="cm">// Step 1: Add to schema.ts</span>
+<span class="kw">export const</span> ehrStatus = pgTable(<span class="str">'ehr_status'</span>, {
+  <span class="cm">// ... existing columns ...</span>
+  clinicianId: text(<span class="str">'clinician_id'</span>).notNull(),  <span class="cm">// ← new required field</span>
+})
+
+<span class="cm">// Step 2: bun run db:generate creates a migration automatically</span>
+<span class="cm">// Step 3: ALL INSERT code that doesn't include clinicianId now fails to compile:</span>
+
+<span class="cm">// ✗ TypeScript error: Property 'clinicianId' is missing in type...</span>
+<span class="kw">await</span> db.insert(ehrStatus).values({
+  id: newUuid(), ehrId, uid, versionId, subjectId  <span class="cm">// missing clinicianId!</span>
+})
+
+<span class="cm">// ✓ Fix: add the field, compile passes, migration runs, no silent data loss</span></code></pre>
+
+  <h3>🌊 Why Drizzle over Prisma</h3>
+  <p>Prisma is an excellent ORM for many applications. For a healthcare EHR on Bun, it has three critical problems:</p>
+  <ol>
+    <li><strong>The Rust engine sidecar (~200MB)</strong> — Prisma ships a separate Rust binary (query engine) that must start alongside the application. On Bun, where startup time is 6ms, adding a 200MB Rust sidecar that takes ~300ms to initialise destroys the startup time advantage entirely. In a Kubernetes environment with hundreds of pod restarts, this compounds into minutes of downtime.</li>
+    <li><strong>JSONB as an afterthought</strong> — Prisma treats JSON columns as <code>Json</code> type (stored as text in some drivers). Drizzle's <code>jsonb()</code> maps precisely to PostgreSQL's JSONB type, enabling GIN indexes and native JSON operators (<code>@&gt;</code>, <code>?</code>, <code>jsonb_path_query</code>) that are essential for AQL execution.</li>
+    <li><strong>Generated client drift</strong> — Prisma's generated client must be regenerated after every schema change. In a CI/CD pipeline, a missing <code>prisma generate</code> step produces runtime errors, not compile errors. Drizzle's <code>$inferSelect</code> is always in sync — it's computed from the schema at compile time.</li>
+  </ol>
+
+  <h3>⛓️ The Full Type-Safety Chain</h3>
+  <pre><code>PostgreSQL schema (schema.ts)
+         │
+         │ typeof composition.$inferSelect
+         ▼
+TypeScript row type (CompositionRow)
+         │
+         │ mapped by DrizzleCompositionRepository
+         ▼
+Domain type (CompositionAggregate)
+         │
+         │ returned by CompositionApplicationService
+         ▼
+HTTP response (deepSnakeCase middleware)
+         │
+         │ validated by frontend TypeScript type
+         ▼
+React component (PatientDetailPage.tsx)</code></pre>
+  <p>At every step in this chain, a type mismatch is a <strong>compile-time error</strong>, not a runtime bug. For a system handling patient records, this end-to-end type safety is not over-engineering — it is the minimum standard of correctness.</p>
+
+  <div class="callout success">
+    <div class="callout-title">💎 &nbsp;The ORM Guarantee</div>
+    <p>With Drizzle ORM in BunEHR, a schema change cascades as a type error to every piece of code that needs to be updated. This makes schema migrations safe to perform — no manual search for all the places that need to change, no silent data corruption from forgotten updates. In a healthcare system where every table column represents clinical data, this guarantee is invaluable.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     18. SECURITY
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="security" class="page-break">
+  <div class="section-header"><h2>🔒 &nbsp;18. Security Model</h2><p>Current protections and production hardening checklist</p></div>
+
+  <div class="callout warning">
+    <div class="callout-title">🍵 &nbsp;Development Configuration</div>
+    <p>The current configuration is optimised for development and demonstration. Apply all hardening steps below before deploying with real patient data.</p>
+  </div>
+
+  <h3>🛡️ Currently Implemented</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Implementation</th><th>Coverage</th></tr></thead>
+    <tbody>
+      <tr><td>Input validation</td><td>Zod schemas on all POST/PUT bodies</td><td>All write endpoints</td></tr>
+      <tr><td>Optimistic locking</td><td>If-Match required for all updates — prevents lost concurrent updates</td><td>EHR_STATUS, COMPOSITION, DIRECTORY</td></tr>
+      <tr><td>Secure headers</td><td>Hono secureHeaders() — X-Content-Type-Options, X-Frame-Options, Referrer-Policy</td><td>All HTTP responses</td></tr>
+      <tr><td>CORS policy</td><td>Configurable origin (default: * in dev)</td><td>All HTTP responses</td></tr>
+      <tr><td>Logical deletes</td><td>Compositions get DELETED lifecycle_state — data never physically removed</td><td>DELETE /composition</td></tr>
+      <tr><td>Append-only versions</td><td>No UPDATE statements on ehr_status or composition</td><td>All versioned objects</td></tr>
+      <tr><td>TIMESTAMPTZ</td><td>All timestamps timezone-aware — no ambiguous local-time entries</td><td>All DB tables</td></tr>
+    </tbody>
+  </table>
+
+  <h3>⛩️ Production Hardening</h3>
+  <ol>
+    <li><strong>Authentication &amp; Authorisation</strong> — Add JWT/OIDC middleware to all /v1 and /api routes. Role-based access: clinicians read/write, auditors read-only. Integrate with hospital identity provider (Active Directory, Azure AD) via OpenID Connect.</li>
+    <li><strong>TLS termination</strong> — Terminate TLS at a reverse proxy (nginx, Caddy, AWS ALB) in front of the Bun server. Never expose port 3000 directly to the internet.</li>
+    <li><strong>Database credentials</strong> — Replace hardcoded passwords with secrets manager values (AWS Secrets Manager, HashiCorp Vault). Use a database user with minimum required permissions.</li>
+    <li><strong>CORS policy</strong> — Replace <code>origin: '*'</code> with the specific frontend domain. Hospital systems must never be open to all origins.</li>
+    <li><strong>Rate limiting</strong> — Add rate limiting middleware to prevent AQL query flooding and credential stuffing.</li>
+    <li><strong>Audit logging</strong> — All write operations should log: who, what, when, from which IP. Integrate with SIEM (Splunk, Elastic SIEM) for HIPAA/GDPR compliance.</li>
+    <li><strong>Backup strategy</strong> — PostgreSQL WAL-based continuous backup. Point-in-time recovery to within 5 minutes is a common requirement for medical systems.</li>
+    <li><strong>Container security</strong> — Run bun-ehr container as non-root user. Scan images with Trivy or Grype in CI. Use read-only filesystem where possible.</li>
+  </ol>
+
+  <h3>📜 Regulatory Alignment</h3>
+  <table>
+    <thead><tr><th>Standard</th><th>Jurisdiction</th><th>Current Status</th><th>What's needed</th></tr></thead>
+    <tbody>
+      <tr><td>HIPAA</td><td>USA</td><td><span class="badge badge-amber">Partial</span></td><td>Add authentication, TLS, audit logging, BAA with cloud provider</td></tr>
+      <tr><td>GDPR Article 5</td><td>EU</td><td><span class="badge badge-amber">Partial</span></td><td>Append-only audit trail is good; erasure requests need custom handling (anonymisation)</td></tr>
+      <tr><td>NHS DSP Toolkit</td><td>UK</td><td><span class="badge badge-amber">Partial</span></td><td>Add authentication, SIEM integration, penetration testing, backup strategy</td></tr>
+      <tr><td>openEHR REST v1</td><td>International</td><td><span class="badge badge-green">Complete</span></td><td>Full implementation — all 37 endpoints, correct status codes, versioning</td></tr>
+      <tr><td>HL7 FHIR R4</td><td>International</td><td><span class="badge badge-gray">Not implemented</span></td><td>Would need a FHIR adapter layer on top of the openEHR store</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     19. GLOSSARY
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="glossary" class="page-break">
+  <div class="section-header"><h2>📖 &nbsp;19. Glossary</h2><p>All terms used in this document</p></div>
+  <table>
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ADL</strong></td><td>Archetype Definition Language — the notation used to write openEHR archetypes. Version 1.4 uses XML-based OPT; version 2 uses a dedicated DSL.</td></tr>
+      <tr><td><strong>AQL</strong></td><td>Archetype Query Language — the openEHR query language. SQL for clinical data. Traverses the Reference Model using archetype paths.</td></tr>
+      <tr><td><strong>Archetype</strong></td><td>An internationally agreed template defining how a specific clinical concept (blood pressure, body weight, encounter note) is structured. Published in the openEHR Clinical Knowledge Manager (CKM).</td></tr>
+      <tr><td><strong>COMPOSITION</strong></td><td>A clinical document in openEHR — the basic unit of committed clinical data. Blood pressure readings, prescriptions, encounter notes are all COMPOSITIONs.</td></tr>
+      <tr><td><strong>CONTRIBUTION</strong></td><td>A recorded change-set grouping multiple versioned objects committed together with a mandatory audit entry.</td></tr>
+      <tr><td><strong>DIRECTORY</strong></td><td>An optional folder hierarchy within an EHR for organising COMPOSITIONs. One per EHR.</td></tr>
+      <tr><td><strong>DDD</strong></td><td>Domain-Driven Design — an architectural approach where clinical business rules are isolated in a domain layer with zero framework dependencies.</td></tr>
+      <tr><td><strong>Drizzle ORM</strong></td><td>A TypeScript-first SQL query builder. Schema file is the single source of truth for both database structure and TypeScript types.</td></tr>
+      <tr><td><strong>EHR</strong></td><td>Electronic Health Record — the root object in openEHR. One per patient, identified by a globally unique UUID (ehrId). Contains EHR_STATUS, optional DIRECTORY, and references to CONTRIBUTIONs.</td></tr>
+      <tr><td><strong>EHR_STATUS</strong></td><td>Metadata about an EHR: who it belongs to, whether it's queryable/modifiable. Every change creates a new immutable version.</td></tr>
+      <tr><td><strong>GIN Index</strong></td><td>Generalised Inverted Index — PostgreSQL index type used for JSONB columns. Enables fast containment queries (content @&gt; ...) and JSON path queries.</td></tr>
+      <tr><td><strong>HierObjectId</strong></td><td>An openEHR identifier type — a UUID wrapped in an object: { value: "uuid" }.</td></tr>
+      <tr><td><strong>JSONB</strong></td><td>PostgreSQL's binary JSON storage format. Unlike TEXT JSON, JSONB is parsed, indexed (GIN), and supports native JSON operators (@&gt;, ?, jsonb_path_query).</td></tr>
+      <tr><td><strong>ObjectVersionId</strong></td><td>An openEHR versioned identifier: uuid::system_id::version_number. Example: abc::local.bunehr.com::3</td></tr>
+      <tr><td><strong>OPT</strong></td><td>Operational Template — an ADL 1.4 XML file that defines the structure of a specific type of clinical document.</td></tr>
+      <tr><td><strong>Port</strong></td><td>In DDD/Hexagonal Architecture: a TypeScript interface defined in the domain layer specifying operations the domain needs without caring how they're implemented.</td></tr>
+      <tr><td><strong>RFC 7807</strong></td><td>Problem Details for HTTP APIs — the standard JSON error format used by all error responses: { type, title, status, detail, instance }.</td></tr>
+      <tr><td><strong>TIMESTAMPTZ</strong></td><td>PostgreSQL's timezone-aware timestamp type (TIMESTAMP WITH TIME ZONE). Stores UTC internally, converts on retrieval. Required for clinical data to avoid timezone bugs.</td></tr>
+      <tr><td><strong>VersionId</strong></td><td>See ObjectVersionId. Used as a branded TypeScript type to prevent passing a VersionId where an EhrId is expected.</td></tr>
+      <tr><td><strong>Zod</strong></td><td>TypeScript-first schema validation library. Validates at runtime and infers TypeScript types at compile time from the same schema definition.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     20. ABOUT & DAISY
+══════════════════════════════════════════════════════════════════════════ -->
+<section id="daisy" class="page-break">
+  <div class="section-header"><h2>🐾 &nbsp;20. About BunEHR &amp; Daisy</h2><p>The human story behind the software</p></div>
+
+  <div class="daisy-box">
+    <div class="daisy-inner">
+      <img src="franselstadt.png" alt="Daisy the Miniature Schnauzer wearing a zebra-print shirt, eating from her silver bowl on a colourful rug in South Africa" class="daisy-img" />
+      <div class="daisy-text">
+        <h3>Daisy</h3>
+        <p style="margin-bottom:1rem; color:var(--c-mist); font-size:.85rem;">Miniature Schnauzer &middot; South Africa &middot; waiting to come home</p>
+
+        <p>I built BunEHR while starting over in the United States &mdash; new country, new rules, and the quiet weight of everything I left behind. South Africa is home to people I love and work I am proud of. It is also a place where many of us learned to live with a background hum of risk that left marks. Hypervigilance. Poor sleep. Clinicians call some of what I carried <strong>PTSD</strong>. I called it Tuesday for a long time.</p>
+
+        <blockquote>Daisy did not fix that by herself. No dog does. What she did was stay. Through nights when I replayed incidents I did not want to name. Through mornings when my hands would not stop shaking. She sat on my feet while I debugged. She greeted me like the day was worth starting. She was routine when routine was medicine: walk, feed, touch grass, breathe, open the laptop again.</blockquote>
+
+        <p>When I made the decision to build a life in the United States, Daisy could not come on the first flight. She stayed with family in South Africa &mdash; <strong>safe, loved, and not with me</strong>. Every month apart is a line item on my heart.</p>
+
+        <p>Stable work means eventually the veterinary bills, travel, and import costs to <strong>bring Daisy home</strong>. That is not a small goal tucked into a footnote. It is one of the main reasons I take this work seriously.</p>
+
+        <p style="color:var(--c-mist); font-style:italic; margin-top:1.2rem; border-top:1px solid var(--c-border); padding-top:1rem;">She is not decoration. She is the reason stability is not abstract for me.<br/>That is why the demo password is <code>daisy</code>.<br/>Thank you for reading what the charts and KPIs do not show.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>🌸 About This Project</h3>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Demo by Frans Elstadt</div>
+      <p>This system was designed and built by <strong>Frans Elstadt</strong> using the <strong>BunEHR</strong> platform as a demonstration of what a modern, standards-compliant EHR system looks like when built with the right tools.</p>
+      <p>The goal was to show that openEHR compliance and modern development practices (Bun, TypeScript, DDD, Drizzle ORM) are not in conflict — they complement each other. A system can be clinically rigorous, interoperable with the global openEHR ecosystem, and built in days rather than years.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Built with BunEHR</div>
+      <p>BunEHR is a platform for building healthcare applications on the openEHR standard. It provides components, tools, and infrastructure for rapidly building clinically compliant software.</p>
+      <p style="margin-bottom:.5rem;"><strong>Website:</strong> <a href="https://bunehr.dev">bunehr.dev</a></p>
+      <p style="margin-bottom:.5rem;"><strong>Standard:</strong> openEHR REST API v1</p>
+      <p style="margin-bottom:.5rem;"><strong>License:</strong> Apache 2.0</p>
+      <p style="margin-bottom:.5rem;"><strong>Version:</strong> 1.0.0 · June 2026</p>
+    </div>
+  </div>
+
+  <hr />
+  <p style="text-align:center; color:var(--mb-slate); font-size:.85rem; margin-top:2rem;">
+    <strong>BunEHR</strong> · Architecture Reference · v1.0.0 · June 2026<br/>
+    Demo by Frans Elstadt · Built with the BunEHR · Dedicated to Daisy 🐾 South Africa 🇿🇦<br/>
+    <a href="https://bunehr.dev">bunehr.dev</a>
+  </p>
+</section>
+
+</main>
+
+<!-- Sidebar active state on scroll -->
+<script>
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.sidebar a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.sidebar a[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.15 });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

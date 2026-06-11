@@ -1,0 +1,111 @@
+##############################################################
+# Meblock EHR — Docker Compose
+#
+# Services:
+#   postgres    PostgreSQL 16   → localhost:5433
+#   pgadmin     pgAdmin 4       → localhost:5050
+#   bun-ehr     Meblock EHR API → localhost:3000
+#
+# Start:     docker compose up -d
+# Rebuild:   docker compose up -d --build
+# Logs:      docker compose logs -f bun-ehr
+# Stop all:  docker compose down
+# Wipe data: docker compose down -v
+##############################################################
+
+services:
+
+  # ── PostgreSQL 16 ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: bunehr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-ehrdb}
+      POSTGRES_USER:     ${POSTGRES_USER:-ehr_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ehr_pass}
+      PGDATA:            /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ehr_user} -d ${POSTGRES_DB:-ehrdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [ehr-net]
+
+  # ── pgAdmin 4 ─────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bunehr-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:            ${PGADMIN_EMAIL:-admin@bunehr.com}
+      PGADMIN_DEFAULT_PASSWORD:         ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE:       "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_HOST_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [ehr-net]
+
+  # ── Meblock EHR API ───────────────────────────────────────────────────────
+  bun-ehr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: meblock-ehr:latest
+    container_name: bunehr-api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      # Internal Docker network URL — 'postgres' resolves to the postgres service
+      DATABASE_URL: postgres://${POSTGRES_USER:-ehr_user}:${POSTGRES_PASSWORD:-ehr_pass}@postgres:5432/${POSTGRES_DB:-ehrdb}
+      SYSTEM_ID: local.bunehr.com
+    ports:
+      # Use BUN_EHR_PORT to avoid clashing with any host PORT env var
+      - "${BUN_EHR_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks: [ehr-net]
+
+  # ── Meblock EHR Frontend ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: meblock-ehr-frontend:latest
+    container_name: bunehr-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ""    # empty = same-origin (nginx proxies /v1 and /api)
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      bun-ehr:
+        condition: service_healthy
+    networks: [ehr-net]
+
+volumes:
+  postgres_data: { driver: local }
+  pgadmin_data:  { driver: local }
+
+networks:
+  ehr-net:
+    driver: bridge
+    name: bunehr-network

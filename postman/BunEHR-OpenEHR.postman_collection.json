@@ -1,0 +1,615 @@
+{
+  "info": {
+    "_postman_id": "c1d2e3f4-a5b6-7890-cdef-012345678901",
+    "name": "Meblock EHR — OpenEHR REST API v1 (BunEHR)",
+    "description": "Complete Postman collection for the BunEHR backend (Bun + Hono + Drizzle + PostgreSQL).\n\nImplements the full openEHR REST API v1 specification.\n\n## Setup\n1. Import this collection\n2. Import `BunEHR-Local.postman_environment.json`\n3. Select the **BunEHR Local** environment\n4. Run **EHR › Create EHR** first — it auto-populates `{{ehrId}}` for all other requests\n5. Run requests in order within each folder\n\n## Stack\n- Runtime: Bun 1.2\n- Framework: Hono\n- ORM: Drizzle ORM\n- Database: PostgreSQL 16 (JSONB compositions, TIMESTAMPTZ timestamps)\n- WebSocket: Bun native\n\n## Reference\nhttps://specifications.openehr.org/releases/ITS-REST/Release-1.0.3/",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",              "value": "http://localhost:3000",          "type": "string" },
+    { "key": "ehrId",                "value": "",                               "type": "string" },
+    { "key": "ehrStatusVersionUid",  "value": "",                               "type": "string" },
+    { "key": "compositionVersionUid","value": "",                               "type": "string" },
+    { "key": "compositionObjectId",  "value": "",                               "type": "string" },
+    { "key": "contributionUid",      "value": "",                               "type": "string" },
+    { "key": "directoryVersionUid",  "value": "",                               "type": "string" },
+    { "key": "templateId",           "value": "KotlinEHR-Encounter.v1",        "type": "string" },
+    { "key": "subjectId",            "value": "patient-001",                   "type": "string" },
+    { "key": "subjectNamespace",     "value": "local",                         "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health & System",
+      "description": "Health check and root endpoint",
+      "item": [
+        {
+          "name": "Health check",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status UP', () => { const b = pm.response.json(); pm.expect(b.status).to.equal('UP'); });",
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Returns `{ status: 'UP', service: 'BunEHR', version, timestamp }`. Use to verify the container is running."
+          }
+        },
+        {
+          "name": "Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
+            "description": "Returns service info and available endpoint roots."
+          }
+        },
+        {
+          "name": "Seed sample data",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json(); console.log('Seeded:', b.count, 'EHRs');"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/seed", "host": ["{{baseUrl}}"], "path": ["api", "seed"] },
+            "description": "Creates 12 sample patient EHRs in PostgreSQL. Also broadcasts a WebSocket event for each. Run once per fresh database."
+          }
+        }
+      ]
+    },
+    {
+      "name": "EHR",
+      "description": "Electronic Health Record lifecycle. Every patient has exactly one EHR identified by a UUID (ehrId). All clinical data hangs off the EHR.",
+      "item": [
+        {
+          "name": "Create EHR (auto-generated id)",
+          "event": [
+            { "listen": "test", "script": { "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Location header present', () => pm.response.to.have.header('Location'));",
+              "pm.test('ETag header present', () => pm.response.to.have.header('ETag'));",
+              "const loc = pm.response.headers.get('Location');",
+              "if (loc) { const id = loc.split('/').pop(); pm.collectionVariables.set('ehrId', id); console.log('EHR ID:', id); }",
+              "if (pm.response.text()) { try { const b = pm.response.json(); if (b.ehr_status?.uid?.value) pm.collectionVariables.set('ehrStatusVersionUid', b.ehr_status.uid.value); } catch(e){} }"
+            ], "type": "text/javascript" }}
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ehr_status\": {\n    \"subject\": {\n      \"external_ref\": {\n        \"id\": { \"value\": \"{{subjectId}}\" },\n        \"namespace\": \"{{subjectNamespace}}\",\n        \"type\": \"PERSON\"\n      }\n    },\n    \"is_queryable\": true,\n    \"is_modifiable\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr", "host": ["{{baseUrl}}"], "path": ["v1", "ehr"] },
+            "description": "Creates a new EHR with an auto-generated UUID. Returns `201 Created` with a `Location` header pointing to the new EHR.\n\nThe `Prefer: return=representation` header makes the server include the created EHR body in the response (otherwise only headers are returned).\n\n**Auto-populates:** `{{ehrId}}` and `{{ehrStatusVersionUid}}`"
+          }
+        },
+        {
+          "name": "Create EHR with specific id",
+          "event": [{ "listen": "prerequest", "script": { "exec": [
+            "const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); });",
+            "pm.collectionVariables.set('newEhrId', uuid());"
+          ], "type": "text/javascript" }},
+          { "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ehr_status\": {\n    \"subject\": {\n      \"external_ref\": {\n        \"id\": { \"value\": \"patient-{{$randomInt}}\" },\n        \"namespace\": \"local\",\n        \"type\": \"PERSON\"\n      }\n    },\n    \"is_queryable\": true,\n    \"is_modifiable\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{newEhrId}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{newEhrId}}"] },
+            "description": "Creates an EHR with a client-specified UUID. Useful when migrating existing patient records that already have assigned identifiers."
+          }
+        },
+        {
+          "name": "Get EHR by id",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Has ehr_id', () => pm.expect(pm.response.json()).to.have.property('ehr_id'));",
+            "const b = pm.response.json(); if (b.ehr_status?.uid?.value) pm.collectionVariables.set('ehrStatusVersionUid', b.ehr_status.uid.value);"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}"] },
+            "description": "Retrieves the full EHR object including current `ehr_status`. The `ETag` response header contains the current EHR_STATUS version uid."
+          }
+        },
+        {
+          "name": "Get EHR by subject id",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/ehr?subject_id={{subjectId}}&subject_namespace={{subjectNamespace}}",
+              "host": ["{{baseUrl}}"], "path": ["v1", "ehr"],
+              "query": [
+                { "key": "subject_id", "value": "{{subjectId}}" },
+                { "key": "subject_namespace", "value": "{{subjectNamespace}}" }
+              ]
+            },
+            "description": "Finds an EHR by the patient's external subject identifier. Useful when you only have the patient's ID from a demographics system, not the openEHR EHR ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "EHR_STATUS",
+      "description": "Manages the EHR_STATUS object — who the EHR belongs to and whether it's queryable/modifiable. Every update creates a new immutable version row in PostgreSQL (append-only).",
+      "item": [
+        {
+          "name": "Get EHR_STATUS",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Has uid', () => pm.expect(pm.response.json()).to.have.property('uid'));",
+            "const b = pm.response.json(); if (b.uid?.value) { pm.collectionVariables.set('ehrStatusVersionUid', b.uid.value); console.log('EHR_STATUS version uid:', b.uid.value); }"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/ehr_status", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "ehr_status"] },
+            "description": "Returns the current EHR_STATUS with the version uid in both the `uid` field and the `ETag` response header.\n\n**Auto-populates:** `{{ehrStatusVersionUid}}`"
+          }
+        },
+        {
+          "name": "Update EHR_STATUS",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) pm.collectionVariables.set('ehrStatusVersionUid', etag.replace(/\"/g, ''));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"{{ehrStatusVersionUid}}\"", "description": "Current version uid — prevents lost updates if two clients update concurrently" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": {\n    \"external_ref\": {\n      \"id\": { \"value\": \"{{subjectId}}\" },\n      \"namespace\": \"{{subjectNamespace}}\",\n      \"type\": \"PERSON\"\n    }\n  },\n  \"is_queryable\": true,\n  \"is_modifiable\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/ehr_status", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "ehr_status"] },
+            "description": "Updates EHR_STATUS. The `If-Match` header with the current version uid is **required** — this is openEHR's optimistic locking mechanism. Returns `412 Precondition Failed` if the version has changed since you last read it.\n\nInternally, this INSERTs a new row in `ehr_status` — the old version is preserved permanently."
+          }
+        },
+        {
+          "name": "Get EHR_STATUS at version",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/ehr_status/{{ehrStatusVersionUid}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "ehr_status", "{{ehrStatusVersionUid}}"] },
+            "description": "Retrieves a specific historical version of EHR_STATUS by its full version uid (`uuid::system::version`)."
+          }
+        },
+        {
+          "name": "Get versioned EHR_STATUS (full history)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/versioned_ehr_status", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "versioned_ehr_status"] },
+            "description": "Returns the complete revision history of this EHR's status — every change ever made, with timestamps and audit details. Backed by PostgreSQL's append-only `ehr_status` table."
+          }
+        }
+      ]
+    },
+    {
+      "name": "COMPOSITION",
+      "description": "Clinical documents — the core of openEHR. Every piece of clinical data (blood pressure, medications, encounter notes) is a COMPOSITION. All updates create new immutable versions; nothing is ever overwritten.",
+      "item": [
+        {
+          "name": "Create COMPOSITION",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.test('ETag present', () => pm.response.to.have.header('ETag'));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) { const vid = etag.replace(/\"/g,''); pm.collectionVariables.set('compositionVersionUid', vid); pm.collectionVariables.set('compositionObjectId', vid.split('::')[0]); console.log('Composition VID:', vid); }"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"archetype_node_id\": \"openEHR-EHR-COMPOSITION.encounter.v1\",\n  \"name\": { \"value\": \"Encounter\" },\n  \"archetype_details\": {\n    \"archetype_id\": { \"value\": \"openEHR-EHR-COMPOSITION.encounter.v1\" },\n    \"template_id\": { \"value\": \"{{templateId}}\" },\n    \"rm_version\": \"1.1.0\"\n  },\n  \"language\": {\n    \"terminology_id\": { \"value\": \"ISO_639-1\" },\n    \"code_string\": \"en\"\n  },\n  \"territory\": {\n    \"terminology_id\": { \"value\": \"ISO_3166-1\" },\n    \"code_string\": \"US\"\n  },\n  \"category\": {\n    \"value\": \"event\",\n    \"defining_code\": {\n      \"terminology_id\": { \"value\": \"openehr\" },\n      \"code_string\": \"433\"\n    }\n  },\n  \"composer\": {\n    \"name\": \"Dr. Jane Smith\",\n    \"external_ref\": {\n      \"id\": { \"value\": \"dr-smith-001\" },\n      \"namespace\": \"local\",\n      \"type\": \"PERSON\"\n    }\n  },\n  \"context\": {\n    \"start_time\": { \"value\": \"2026-06-10T14:00:00Z\" },\n    \"setting\": {\n      \"value\": \"primary medical care\",\n      \"defining_code\": {\n        \"terminology_id\": { \"value\": \"openehr\" },\n        \"code_string\": \"228\"\n      }\n    }\n  },\n  \"content\": [\n    {\n      \"archetype_node_id\": \"openEHR-EHR-OBSERVATION.blood_pressure.v2\",\n      \"name\": { \"value\": \"Blood pressure\" },\n      \"data\": {\n        \"systolic\":  { \"magnitude\": 120, \"units\": \"mm[Hg]\" },\n        \"diastolic\": { \"magnitude\": 80,  \"units\": \"mm[Hg]\" }\n      }\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/composition", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "composition"] },
+            "description": "Creates a new COMPOSITION (clinical document) stored as **JSONB** in PostgreSQL. The composition content can be any valid openEHR structure.\n\nVersion uid format: `uuid::local.bunehr.com::1`\n\n**Auto-populates:** `{{compositionVersionUid}}` and `{{compositionObjectId}}`"
+          }
+        },
+        {
+          "name": "Get COMPOSITION by version uid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Has uid', () => pm.expect(pm.response.json()).to.have.property('uid'));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/composition/{{compositionVersionUid}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "composition", "{{compositionVersionUid}}"] },
+            "description": "Retrieves a COMPOSITION by its full versioned uid OR by its object id (the UUID part before `::`)."
+          }
+        },
+        {
+          "name": "Get COMPOSITION at time",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/composition/{{compositionObjectId}}?version_at_time=2026-06-10T15:00:00Z",
+              "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "composition", "{{compositionObjectId}}"],
+              "query": [{ "key": "version_at_time", "value": "2026-06-10T15:00:00Z" }]
+            },
+            "description": "Time-travel query — returns the version of this COMPOSITION that was active at a given point in time. Uses PostgreSQL's TIMESTAMPTZ for accurate timezone-aware comparison."
+          }
+        },
+        {
+          "name": "Update COMPOSITION",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) { pm.collectionVariables.set('compositionVersionUid', etag.replace(/\"/g,'')); }"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"{{compositionVersionUid}}\"" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"archetype_node_id\": \"openEHR-EHR-COMPOSITION.encounter.v1\",\n  \"name\": { \"value\": \"Encounter (Updated)\" },\n  \"archetype_details\": {\n    \"archetype_id\": { \"value\": \"openEHR-EHR-COMPOSITION.encounter.v1\" },\n    \"template_id\": { \"value\": \"{{templateId}}\" },\n    \"rm_version\": \"1.1.0\"\n  },\n  \"language\": { \"terminology_id\": { \"value\": \"ISO_639-1\" }, \"code_string\": \"en\" },\n  \"territory\": { \"terminology_id\": { \"value\": \"ISO_3166-1\" }, \"code_string\": \"US\" },\n  \"category\": {\n    \"value\": \"event\",\n    \"defining_code\": { \"terminology_id\": { \"value\": \"openehr\" }, \"code_string\": \"433\" }\n  },\n  \"composer\": { \"name\": \"Dr. Jane Smith\" },\n  \"context\": {\n    \"start_time\": { \"value\": \"2026-06-10T14:00:00Z\" },\n    \"setting\": { \"value\": \"primary medical care\", \"defining_code\": { \"terminology_id\": { \"value\": \"openehr\" }, \"code_string\": \"228\" } }\n  },\n  \"content\": [\n    {\n      \"archetype_node_id\": \"openEHR-EHR-OBSERVATION.blood_pressure.v2\",\n      \"name\": { \"value\": \"Blood pressure\" },\n      \"data\": {\n        \"systolic\":  { \"magnitude\": 130, \"units\": \"mm[Hg]\" },\n        \"diastolic\": { \"magnitude\": 85,  \"units\": \"mm[Hg]\" }\n      }\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/composition/{{compositionObjectId}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "composition", "{{compositionObjectId}}"] },
+            "description": "Updates a COMPOSITION by INSERTing a new version row in PostgreSQL (`version::2`). The old version is preserved forever. Requires `If-Match` with the current version uid.\n\nReturns `412 Precondition Failed` if the version has changed."
+          }
+        },
+        {
+          "name": "Get versioned COMPOSITION (full history)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/versioned_composition/{{compositionObjectId}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "versioned_composition", "{{compositionObjectId}}"] },
+            "description": "Returns complete revision history — every version of this COMPOSITION with timestamps and audit details."
+          }
+        },
+        {
+          "name": "Delete COMPOSITION (logical)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/composition/{{compositionVersionUid}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "composition", "{{compositionVersionUid}}"] },
+            "description": "Logical delete — creates a new version with `lifecycle_state = 'DELETED'`. The original data is never removed from PostgreSQL. This preserves the audit trail required by healthcare regulations."
+          }
+        }
+      ]
+    },
+    {
+      "name": "CONTRIBUTION",
+      "description": "Change-sets — group multiple clinical updates into a single audited transaction with a committer, timestamp, and reason.",
+      "item": [
+        {
+          "name": "Create CONTRIBUTION",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const loc = pm.response.headers.get('Location'); if (loc) { pm.collectionVariables.set('contributionUid', loc.split('/').pop()); }"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"versions\": [\n    {\n      \"contribution\": { \"id\": { \"value\": \"placeholder\" } },\n      \"data\": {\n        \"_type\": \"COMPOSITION\",\n        \"name\": { \"value\": \"Contribution Encounter\" }\n      },\n      \"commit_audit\": {\n        \"committer\": { \"name\": \"Dr. John Doe\" },\n        \"change_type\": {\n          \"value\": \"creation\",\n          \"defining_code\": { \"terminology_id\": { \"value\": \"openehr\" }, \"code_string\": \"249\" }\n        }\n      }\n    }\n  ],\n  \"audit\": {\n    \"committer\": { \"name\": \"Dr. John Doe\" },\n    \"change_type\": {\n      \"value\": \"creation\",\n      \"defining_code\": { \"terminology_id\": { \"value\": \"openehr\" }, \"code_string\": \"249\" }\n    },\n    \"description\": { \"value\": \"Initial clinical encounter documentation\" }\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/contribution", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "contribution"] },
+            "description": "Creates a CONTRIBUTION grouping one or more versioned objects committed together with a single audit entry. Essential for HIPAA/GDPR compliance — every change has a documented committer and reason.\n\n**Auto-populates:** `{{contributionUid}}`"
+          }
+        },
+        {
+          "name": "Get CONTRIBUTION by uid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/contribution/{{contributionUid}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "contribution", "{{contributionUid}}"] },
+            "description": "Retrieves a CONTRIBUTION with its complete audit details and list of versioned objects."
+          }
+        }
+      ]
+    },
+    {
+      "name": "DIRECTORY",
+      "description": "Folder structure within an EHR to organise compositions. Backed by a JSONB `items` column in PostgreSQL with versioned rows.",
+      "item": [
+        {
+          "name": "Create DIRECTORY",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) pm.collectionVariables.set('directoryVersionUid', etag.replace(/\"/g,''));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": { \"value\": \"root\" },\n  \"folders\": [\n    { \"name\": { \"value\": \"Encounters\" } },\n    { \"name\": { \"value\": \"Medications\" } },\n    { \"name\": { \"value\": \"Lab Results\" } },\n    { \"name\": { \"value\": \"Imaging\" } }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/directory", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "directory"] },
+            "description": "Creates a folder hierarchy for this EHR. One directory per EHR — enforced by a UNIQUE constraint in PostgreSQL.\n\n**Auto-populates:** `{{directoryVersionUid}}`"
+          }
+        },
+        {
+          "name": "Get DIRECTORY",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) pm.collectionVariables.set('directoryVersionUid', etag.replace(/\"/g,''));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/directory", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "directory"] },
+            "description": "Returns the current directory. The `ETag` header contains the current version uid needed for updates."
+          }
+        },
+        {
+          "name": "Update DIRECTORY",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const etag = pm.response.headers.get('ETag'); if (etag) pm.collectionVariables.set('directoryVersionUid', etag.replace(/\"/g,''));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"{{directoryVersionUid}}\"" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": { \"value\": \"root\" },\n  \"folders\": [\n    { \"name\": { \"value\": \"Encounters\" } },\n    { \"name\": { \"value\": \"Medications\" } },\n    { \"name\": { \"value\": \"Lab Results\" } },\n    { \"name\": { \"value\": \"Imaging\" } },\n    { \"name\": { \"value\": \"Referrals\" } }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/directory", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "directory"] },
+            "description": "Updates the directory. Internally deletes the current row and inserts a new one with an incremented version id."
+          }
+        },
+        {
+          "name": "Get DIRECTORY at version",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/directory/{{directoryVersionUid}}", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "directory", "{{directoryVersionUid}}"] },
+            "description": "Retrieves the directory at a specific historical version."
+          }
+        },
+        {
+          "name": "Delete DIRECTORY",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "If-Match", "value": "\"{{directoryVersionUid}}\"" }],
+            "url": { "raw": "{{baseUrl}}/v1/ehr/{{ehrId}}/directory", "host": ["{{baseUrl}}"], "path": ["v1", "ehr", "{{ehrId}}", "directory"] },
+            "description": "Permanently deletes the directory. Requires `If-Match` header."
+          }
+        }
+      ]
+    },
+    {
+      "name": "QUERY (AQL)",
+      "description": "Archetype Query Language — the SQL equivalent for openEHR. Query across all patients' clinical data using structured paths.",
+      "item": [
+        {
+          "name": "Execute AQL (POST) — All EHRs",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Has rows and columns', () => { const b = pm.response.json(); pm.expect(b).to.have.property('rows'); pm.expect(b).to.have.property('columns'); });",
+            "console.log('Rows returned:', pm.response.json().rows?.length ?? 0);"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"SELECT e/ehr_id/value, e/time_created/value FROM EHR e ORDER BY e/time_created DESC\",\n  \"fetch\": 20,\n  \"offset\": 0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/query/aql", "host": ["{{baseUrl}}"], "path": ["v1", "query", "aql"] },
+            "description": "Executes an AQL query. The response always includes `columns` (with name and path) and `rows` (array of arrays). The `meta` field describes the query engine."
+          }
+        },
+        {
+          "name": "Execute AQL (POST) — Compositions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"SELECT e/ehr_id/value, c/uid/value, c/name/value, c/archetype_details/template_id/value FROM EHR e CONTAINS COMPOSITION c\",\n  \"fetch\": 50\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/query/aql", "host": ["{{baseUrl}}"], "path": ["v1", "query", "aql"] },
+            "description": "Lists all compositions across all patients. The CONTAINS clause traverses the EHR → COMPOSITION containment hierarchy."
+          }
+        },
+        {
+          "name": "Execute AQL (GET)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/query/aql?q=SELECT e/ehr_id/value FROM EHR e&fetch=10",
+              "host": ["{{baseUrl}}"], "path": ["v1", "query", "aql"],
+              "query": [
+                { "key": "q", "value": "SELECT e/ehr_id/value FROM EHR e" },
+                { "key": "fetch", "value": "10" }
+              ]
+            },
+            "description": "GET variant — passes the AQL query as a query parameter. Useful for bookmarking common queries."
+          }
+        },
+        {
+          "name": "Save stored query",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"SELECT e/ehr_id/value, c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c\",\n  \"type\": \"aql\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/query/stored-queries/org.bunehr::all-compositions/1.0.0", "host": ["{{baseUrl}}"], "path": ["v1", "query", "stored-queries", "org.bunehr::all-compositions", "1.0.0"] },
+            "description": "Saves a named, versioned AQL query to PostgreSQL. Reusable across systems — any openEHR v1 client can execute stored queries by name."
+          }
+        },
+        {
+          "name": "List stored queries",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/query/stored-queries", "host": ["{{baseUrl}}"], "path": ["v1", "query", "stored-queries"] },
+            "description": "Lists all stored AQL queries in the database."
+          }
+        },
+        {
+          "name": "Execute stored query",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/query/aql/org.bunehr::all-compositions", "host": ["{{baseUrl}}"], "path": ["v1", "query", "aql", "org.bunehr::all-compositions"] },
+            "description": "Executes a previously saved stored query by its qualified name."
+          }
+        }
+      ]
+    },
+    {
+      "name": "DEFINITION (Templates)",
+      "description": "Clinical template management. Templates define the structure of compositions. Supports ADL 1.4 (OPT/XML) and ADL 2 formats.",
+      "item": [
+        {
+          "name": "Upload ADL 1.4 template",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/xml" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<template xmlns=\"http://schemas.openehr.org/v1\">\n  <language>\n    <terminology_id><value>ISO_639-1</value></terminology_id>\n    <code_string>en</code_string>\n  </language>\n  <description>\n    <original_author id=\"date\">2026-06-10</original_author>\n    <lifecycle_state>published</lifecycle_state>\n  </description>\n  <uid><value>{{templateId}}</value></uid>\n  <template_id><value>{{templateId}}</value></template_id>\n  <concept>encounter</concept>\n</template>"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/definition/template/adl1.4", "host": ["{{baseUrl}}"], "path": ["v1", "definition", "template", "adl1.4"] },
+            "description": "Uploads an Operational Template (OPT) in ADL 1.4 XML format. The template_id is extracted from the XML content."
+          }
+        },
+        {
+          "name": "List ADL 1.4 templates",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array response', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/definition/template/adl1.4", "host": ["{{baseUrl}}"], "path": ["v1", "definition", "template", "adl1.4"] },
+            "description": "Lists all ADL 1.4 templates stored in the `template_definition` PostgreSQL table."
+          }
+        },
+        {
+          "name": "Get template",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/definition/template/adl1.4/{{templateId}}", "host": ["{{baseUrl}}"], "path": ["v1", "definition", "template", "adl1.4", "{{templateId}}"] },
+            "description": "Retrieves a specific template including its full content."
+          }
+        },
+        {
+          "name": "Get example COMPOSITION",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/v1/definition/template/adl1.4/{{templateId}}/example", "host": ["{{baseUrl}}"], "path": ["v1", "definition", "template", "adl1.4", "{{templateId}}", "example"] },
+            "description": "Returns a skeleton COMPOSITION conforming to this template — useful as a starting point for building composition requests."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patient API (BFF)",
+      "description": "Frontend-friendly aggregate API built on top of the openEHR store. Returns enriched patient summaries combining EHR data with demographic info.",
+      "item": [
+        {
+          "name": "List all patients",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+            "console.log('Patients:', pm.response.json().length);"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/patients", "host": ["{{baseUrl}}"], "path": ["api", "patients"] },
+            "description": "Returns all 12 sample patients with demographics, ward assignments, current vital signs, and status. Merges sample data with actual EHR IDs from PostgreSQL where available."
+          }
+        },
+        {
+          "name": "Get patient by EHR id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/patients/ehr-001", "host": ["{{baseUrl}}"], "path": ["api", "patients", "ehr-001"] },
+            "description": "Returns a single patient's full record by EHR ID. IDs ehr-001 through ehr-012 are available after running the seed endpoint."
+          }
+        },
+        {
+          "name": "Get 24-hour vitals trend",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('24 data points', () => pm.expect(pm.response.json()).to.have.lengthOf(24));"
+          ], "type": "text/javascript" }}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/patients/ehr-001/vitals", "host": ["{{baseUrl}}"], "path": ["api", "patients", "ehr-001", "vitals"] },
+            "description": "Returns 24 hourly vital sign readings (systolic BP, diastolic BP, heart rate, SpO₂, temperature) with realistic jitter applied. Used by the frontend vital trend chart."
+          }
+        }
+      ]
+    }
+  ]
+}

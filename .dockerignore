@@ -1,0 +1,33 @@
+# Exclude everything not needed in the production image
+
+# Frontend (built separately or served by a static CDN)
+frontend/
+
+# Local dev artifacts
+node_modules/
+.env
+*.env.local
+
+# Build outputs
+dist/
+build/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+
+# Git
+.git/
+.gitignore
+
+# Docker itself (no recursive copies)
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker/
