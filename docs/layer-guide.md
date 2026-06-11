@@ -8,7 +8,7 @@ A quick map of folders, naming, and request flow for the backend.
 |---|---|---|
 | Presentation | `src/Api/` | Controllers, middleware, DTOs, `Program.ts` |
 | Application | `src/application/` | Services (`*Service`), contracts (`I*Service`) |
-| Domain | `src/domain/` | Entities, value objects, `I*Repository` ports |
+| Domain | `src/domain/` | Models + `I*Repository` ports (one type per file) |
 | Infrastructure | `src/infrastructure/` | Drizzle repositories, DI, seed data |
 | Host | `src/index.ts` + `src/Api/Program.ts` | Process entry + HTTP pipeline |
 
@@ -16,7 +16,8 @@ A quick map of folders, naming, and request flow for the backend.
 
 | Concept | Location |
 |---|---|
-| `IEhrRepository` | `domain/ehr/EhrAggregate.ts` |
+| `IEhrRepository` | `domain/ehr/repositories/IEhrRepository.ts` |
+| `EhrAggregate` | `domain/ehr/models/EhrAggregate.ts` |
 | `EhrRepository` | `infrastructure/database/repositories/EhrRepository.ts` |
 | `IEhrService` | `application/contracts/IEhrService.ts` |
 | `EhrService` | `application/ehr/EhrService.ts` |

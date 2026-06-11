@@ -3,13 +3,12 @@ import {
   SAMPLE_PATIENTS, customPatients, generateVitalTrend, getAllPatients,
 } from '../../infrastructure/seed/SamplePatients.ts'
 import type { IEhrService } from '../contracts/IEhrService.ts'
-import type { IPatientService, CreatePatientRequest, PatientDto } from '../contracts/IPatientService.ts'
+import type { IPatientService } from '../contracts/IPatientService.ts'
+import type { CreatePatientRequest } from './models/CreatePatientRequest.ts'
+import type { PatientDto } from './models/PatientDto.ts'
 import type { Db } from '../../infrastructure/database/client.ts'
 import { ehr } from '../../infrastructure/database/schema.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
-
-export type PatientDto = SamplePatient & { _hasRealEhr?: boolean }
-export type CreatePatientRequest = Pick<SamplePatient, 'firstName' | 'lastName'> & Partial<SamplePatient>
 
 const defaultLocation = () => ({ lat: 51.5074, lng: -0.1278 })
 

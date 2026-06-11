@@ -30,7 +30,7 @@ export function buildApp(): Hono {
     if (ct.includes('application/json') && c.res.status !== 204) {
       try {
         const body = await c.res.json() as unknown
-        c.res = c.newResponse(JSON.stringify(deepSnakeCase(body)), c.res.status, {
+        c.res = c.newResponse(JSON.stringify(deepSnakeCase(body)), c.res.status as never, {
           'Content-Type': 'application/json',
           ...Object.fromEntries(c.res.headers.entries()),
         })

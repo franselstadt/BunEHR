@@ -1,4 +1,5 @@
-import type { CreatePatientRequest, PatientDto } from '../patient/PatientService.ts'
+import type { CreatePatientRequest } from '../patient/models/CreatePatientRequest.ts'
+import type { PatientDto } from '../patient/models/PatientDto.ts'
 import type { generateVitalTrend } from '../../infrastructure/seed/SamplePatients.ts'
 import type { SamplePatient } from '../../infrastructure/seed/SamplePatients.ts'
 
@@ -11,4 +12,5 @@ export interface IPatientService {
   seedSampleEhRs(onAdmitted: (patient: SamplePatient) => void): Promise<number>
 }
 
-export type { CreatePatientRequest, PatientDto } from '../patient/PatientService.ts'
+export type { CreatePatientRequest } from '../patient/models/CreatePatientRequest.ts'
+export type { PatientDto } from '../patient/models/PatientDto.ts'

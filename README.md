@@ -197,7 +197,11 @@ src/
 │   ├── ehr/EhrService.ts
 │   ├── patient/PatientService.ts
 │   └── …
-├── domain/                      ← Entities + I*Repository ports
+├── domain/                      ← Models + repository ports (1 type per file)
+│   ├── ehr/models/              ← EhrAggregate, EhrStatusVo, …
+│   ├── ehr/repositories/        ← IEhrRepository
+│   ├── composition/models/      ← CompositionAggregate, EventContext, …
+│   └── …                        ← same pattern for contribution/directory/query
 ├── infrastructure/              ← Drizzle repos + DependencyInjection.ts
 │   ├── config/DependencyInjection.ts
 │   └── seed/                    ← Demo data

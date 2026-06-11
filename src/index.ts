@@ -26,9 +26,9 @@ console.log(`
 export default {
   port: PORT,
 
-  fetch(req: Request, server: Server): Response | undefined {
+  fetch(req: Request, server: Server<unknown>): Response | undefined {
     if (new URL(req.url).pathname === '/ws') {
-      if (server.upgrade(req)) return undefined
+      if (server.upgrade(req, { data: {} })) return undefined
       return new Response('WebSocket upgrade failed', { status: 426 })
     }
     return app.fetch(req) as Response

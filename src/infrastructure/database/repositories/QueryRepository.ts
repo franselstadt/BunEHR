@@ -1,7 +1,12 @@
 import { eq, like } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { composition, ehr, storedQuery, templateDefinition } from '../schema.ts'
-import type { IQueryRepository, IDefinitionRepository, AqlQueryResult, StoredQuery, Template, TemplateInfo } from '../../../domain/query/QueryModels.ts'
+import type { IQueryRepository } from '../../../domain/query/repositories/IQueryRepository.ts'
+import type { IDefinitionRepository } from '../../../domain/query/repositories/IDefinitionRepository.ts'
+import type { AqlQueryResult } from '../../../domain/query/models/AqlQueryResult.ts'
+import type { StoredQuery } from '../../../domain/query/models/StoredQuery.ts'
+import type { Template } from '../../../domain/query/models/Template.ts'
+import type { TemplateInfo } from '../../../domain/query/models/TemplateInfo.ts'
 import { TemplateNotFoundError } from '../../../domain/shared/DomainErrors.ts'
 
 // ── AQL Query Repository ─────────────────────────────────────────────────────
@@ -82,7 +87,13 @@ export class DefinitionRepository implements IDefinitionRepository {
       concept: extractConcept(content) ?? null,
       createdAt: now,
     }).onConflictDoUpdate({ target: templateDefinition.templateId, set: { content, adlVersion, updatedAt: now } as never })
-    return { templateId: extracted, adlVersion, content, createdTimestamp: now.toISOString() }
+    return {
+      templateId: extracted,
+      version: extractVersion(content),
+      concept: extractConcept(content),
+      content,
+      createdTimestamp: now.toISOString(),
+    }
   }
 
   async listTemplates(adlVersion: string): Promise<ReadonlyArray<TemplateInfo>> {

@@ -1,4 +1,7 @@
-import type { IContributionRepository, ContributionAggregate, ContributionVersionRequest, ContributionAuditRequest } from '../../domain/contribution/ContributionAggregate.ts'
+import type { IContributionRepository } from '../../domain/contribution/repositories/IContributionRepository.ts'
+import type { ContributionAggregate } from '../../domain/contribution/models/ContributionAggregate.ts'
+import type { ContributionVersionRequest } from '../../domain/contribution/models/ContributionVersionRequest.ts'
+import type { ContributionAuditRequest } from '../../domain/contribution/models/ContributionAuditRequest.ts'
 
 export class ContributionService {
   constructor(private readonly repo: IContributionRepository) {}

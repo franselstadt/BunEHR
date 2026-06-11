@@ -1,24 +1,5 @@
-import type { ObjectVersionId, HierObjectId, DvText } from '../shared/OpenEhrTypes.ts'
-
-export interface ObjectRef { readonly id: HierObjectId; readonly namespace: string; readonly type: string }
-export interface FolderVo {
-  readonly uid?: ObjectVersionId
-  readonly archetypeNodeId?: string
-  readonly name: DvText
-  readonly items?: ReadonlyArray<ObjectRef>
-  readonly folders?: ReadonlyArray<FolderVo>
-}
-export interface DirectoryAggregate {
-  readonly uid: ObjectVersionId
-  readonly archetypeNodeId?: string
-  readonly name: DvText
-  readonly items?: ReadonlyArray<ObjectRef>
-  readonly folders?: ReadonlyArray<FolderVo>
-}
-export interface IDirectoryRepository {
-  create(ehrId: string, data: Omit<DirectoryAggregate, 'uid'>): Promise<DirectoryAggregate>
-  find(ehrId: string, versionAtTime?: string): Promise<DirectoryAggregate>
-  findAtVersion(ehrId: string, versionUid: string, path?: string): Promise<DirectoryAggregate>
-  update(ehrId: string, ifMatch: string, data: Omit<DirectoryAggregate, 'uid'>): Promise<DirectoryAggregate>
-  delete(ehrId: string, ifMatch: string): Promise<void>
-}
+/** Backward-compatible barrel for directory domain contracts and models. */
+export type { ObjectRef } from './models/ObjectRef.ts'
+export type { FolderVo } from './models/FolderVo.ts'
+export type { DirectoryAggregate } from './models/DirectoryAggregate.ts'
+export type { IDirectoryRepository } from './repositories/IDirectoryRepository.ts'

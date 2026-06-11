@@ -1,4 +1,6 @@
-import type { IQueryRepository, AqlQueryResult, StoredQuery } from '../../domain/query/QueryModels.ts'
+import type { IQueryRepository } from '../../domain/query/repositories/IQueryRepository.ts'
+import type { AqlQueryResult } from '../../domain/query/models/AqlQueryResult.ts'
+import type { StoredQuery } from '../../domain/query/models/StoredQuery.ts'
 
 export class QueryService {
   constructor(private readonly repo: IQueryRepository) {}

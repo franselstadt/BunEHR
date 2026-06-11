@@ -1,4 +1,5 @@
-import type { IDirectoryRepository, DirectoryAggregate } from '../../domain/directory/DirectoryAggregate.ts'
+import type { IDirectoryRepository } from '../../domain/directory/repositories/IDirectoryRepository.ts'
+import type { DirectoryAggregate } from '../../domain/directory/models/DirectoryAggregate.ts'
 
 export class DirectoryService {
   constructor(private readonly repo: IDirectoryRepository) {}

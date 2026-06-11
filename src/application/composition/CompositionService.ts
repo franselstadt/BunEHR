@@ -1,4 +1,6 @@
-import type { ICompositionRepository, CompositionAggregate, CompositionVersionedResponse } from '../../domain/composition/CompositionAggregate.ts'
+import type { ICompositionRepository } from '../../domain/composition/repositories/ICompositionRepository.ts'
+import type { CompositionAggregate } from '../../domain/composition/models/CompositionAggregate.ts'
+import type { CompositionVersionedResponse } from '../../domain/composition/models/CompositionVersionedResponse.ts'
 
 export class CompositionService {
   constructor(private readonly repo: ICompositionRepository) {}

@@ -1,4 +1,6 @@
-import type { IDefinitionRepository, Template, TemplateInfo } from '../../domain/query/QueryModels.ts'
+import type { IDefinitionRepository } from '../../domain/query/repositories/IDefinitionRepository.ts'
+import type { Template } from '../../domain/query/models/Template.ts'
+import type { TemplateInfo } from '../../domain/query/models/TemplateInfo.ts'
 
 export class DefinitionService {
   constructor(private readonly repo: IDefinitionRepository) {}
