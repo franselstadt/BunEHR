@@ -1,12 +1,12 @@
 import { eq, like } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { composition, ehr, storedQuery, templateDefinition } from '../schema.ts'
-import type { QueryRepository, DefinitionRepository, AqlQueryResult, StoredQuery, Template, TemplateInfo } from '../../../domain/query/QueryModels.ts'
+import type { IQueryRepository, IDefinitionRepository, AqlQueryResult, StoredQuery, Template, TemplateInfo } from '../../../domain/query/QueryModels.ts'
 import { TemplateNotFoundError } from '../../../domain/shared/DomainErrors.ts'
 
 // ── AQL Query Repository ─────────────────────────────────────────────────────
 
-export class DrizzleQueryRepository implements QueryRepository {
+export class QueryRepository implements IQueryRepository {
   constructor(private readonly db: Db) {}
 
   async executeAql(q: string, offset = 0, fetch = 20, _params?: Record<string, unknown>): Promise<AqlQueryResult> {
@@ -70,7 +70,7 @@ export class DrizzleQueryRepository implements QueryRepository {
 
 // ── Definition/Template Repository ───────────────────────────────────────────
 
-export class DrizzleDefinitionRepository implements DefinitionRepository {
+export class DefinitionRepository implements IDefinitionRepository {
   constructor(private readonly db: Db) {}
 
   async uploadTemplate(adlVersion: string, content: string, _templateId?: string): Promise<Template> {

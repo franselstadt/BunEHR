@@ -15,7 +15,7 @@ export interface DirectoryAggregate {
   readonly items?: ReadonlyArray<ObjectRef>
   readonly folders?: ReadonlyArray<FolderVo>
 }
-export interface DirectoryRepository {
+export interface IDirectoryRepository {
   create(ehrId: string, data: Omit<DirectoryAggregate, 'uid'>): Promise<DirectoryAggregate>
   find(ehrId: string, versionAtTime?: string): Promise<DirectoryAggregate>
   findAtVersion(ehrId: string, versionUid: string, path?: string): Promise<DirectoryAggregate>

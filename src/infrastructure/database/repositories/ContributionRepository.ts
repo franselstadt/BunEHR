@@ -1,12 +1,12 @@
 import { eq, and } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { ehr, contribution, contributionVersion } from '../schema.ts'
-import type { ContributionRepository, ContributionAggregate, ContributionVersionRequest, ContributionAuditRequest } from '../../../domain/contribution/ContributionAggregate.ts'
+import type { IContributionRepository, ContributionAggregate, ContributionVersionRequest, ContributionAuditRequest } from '../../../domain/contribution/ContributionAggregate.ts'
 import { newUuid } from '../../../domain/shared/IdGenerator.ts'
 import { HierObjectId, ObjectVersionId, DvDateTime, SYSTEM_ID } from '../../../domain/shared/OpenEhrTypes.ts'
 import { EhrNotFoundError, ContributionNotFoundError } from '../../../domain/shared/DomainErrors.ts'
 
-export class DrizzleContributionRepository implements ContributionRepository {
+export class ContributionRepository implements IContributionRepository {
   constructor(private readonly db: Db) {}
 
   async create(ehrId: string, versions: ReadonlyArray<ContributionVersionRequest>, audit: ContributionAuditRequest): Promise<ContributionAggregate> {

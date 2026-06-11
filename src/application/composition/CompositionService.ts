@@ -1,7 +1,7 @@
-import type { CompositionRepository, CompositionAggregate, CompositionVersionedResponse } from '../../domain/composition/CompositionAggregate.ts'
+import type { ICompositionRepository, CompositionAggregate, CompositionVersionedResponse } from '../../domain/composition/CompositionAggregate.ts'
 
-export class CompositionApplicationService {
-  constructor(private readonly repo: CompositionRepository) {}
+export class CompositionService {
+  constructor(private readonly repo: ICompositionRepository) {}
 
   async createComposition(ehrId: string, data: Omit<CompositionAggregate, 'uid'>): Promise<CompositionAggregate>          { return this.repo.create(ehrId, data) }
   async getComposition(ehrId: string, uid: string, versionAtTime?: string): Promise<CompositionAggregate>                  { return this.repo.findByVersionUid(ehrId, uid, versionAtTime) }

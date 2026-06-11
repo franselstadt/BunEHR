@@ -7,6 +7,7 @@
  *  - Clinical timeline (compositions / clinical documents)
  *  - OpenEHR data view (raw EHR structure with explanations)
  */
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Box, Grid, Card, CardContent, Typography, Chip, Avatar, Button,
@@ -22,8 +23,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts'
-import { useState } from 'react'
 import { SAMPLE_PATIENTS, generateVitalTrend } from '../api/samplePatients.ts'
+import { getPatient } from '../api/ehrClient.ts'
+import type { Patient } from '../types/openehr.ts'
 import { statusColors, wardColors } from '../theme/medblocksTheme.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
 
@@ -75,8 +77,22 @@ export default function PatientDetailPage() {
   const { ehrId } = useParams<{ ehrId: string }>()
   const navigate   = useNavigate()
   const [tab, setTab] = useState(0)
+  const [patient, setPatient] = useState<Patient | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const patient = SAMPLE_PATIENTS.find(p => p.ehrId === ehrId)
+  useEffect(() => {
+    if (!ehrId) return
+    setLoading(true)
+    getPatient(ehrId)
+      .then(setPatient)
+      .catch(() => setPatient(SAMPLE_PATIENTS.find(p => p.ehrId === ehrId) ?? null))
+      .finally(() => setLoading(false))
+  }, [ehrId])
+
+  if (loading) {
+    return <LinearProgress sx={{ mt: 4 }} />
+  }
+
   if (!patient) {
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>

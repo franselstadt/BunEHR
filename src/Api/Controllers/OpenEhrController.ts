@@ -3,25 +3,12 @@ import { zValidator } from '@hono/zod-validator'
 import {
   CreateEhrSchema, UpdateEhrStatusSchema, CompositionSchema,
   CreateContributionSchema, DirectorySchema, AqlBodySchema, StoredQuerySchema,
-} from './schemas.ts'
-import { handleError } from '../middleware/errorHandler.ts'
-import { deepCamelCase } from '../middleware/snakeCase.ts'
+} from '../Dtos/RequestDtos.ts'
+import { handleError } from '../Middleware/ExceptionMiddleware.ts'
+import { deepCamelCase } from '../Middleware/JsonNamingMiddleware.ts'
 import { PreconditionRequiredError } from '../../domain/shared/DomainErrors.ts'
-import type { EhrApplicationService }          from '../../application/ehr/EhrApplicationService.ts'
-import type { CompositionApplicationService }  from '../../application/composition/CompositionApplicationService.ts'
-import type { ContributionApplicationService } from '../../application/contribution/ContributionApplicationService.ts'
-import type { DirectoryApplicationService }    from '../../application/directory/DirectoryApplicationService.ts'
-import type { QueryApplicationService }        from '../../application/query/QueryApplicationService.ts'
-import type { DefinitionApplicationService }   from '../../application/definition/DefinitionApplicationService.ts'
+import type { AppServices } from '../../application/contracts/AppServices.ts'
 
-type Services = {
-  ehr: EhrApplicationService; composition: CompositionApplicationService
-  contribution: ContributionApplicationService; directory: DirectoryApplicationService
-  query: QueryApplicationService; definition: DefinitionApplicationService
-}
-
-// Convert snake_case schema output → camelCase domain input
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const asDomain = <T>(v: unknown): T => deepCamelCase(v) as T
 
 const getIfMatch = (c: { req: { header: (k: string) => string | undefined } }): string => {
@@ -30,7 +17,8 @@ const getIfMatch = (c: { req: { header: (k: string) => string | undefined } }): 
   return v
 }
 
-export function buildRoutes(svc: Services) {
+/** OpenEhrController — all /v1 openEHR REST endpoints */
+export function createOpenEhrController(svc: AppServices) {
   const app = new Hono()
 
   // ── EHR ────────────────────────────────────────────────────────────────────

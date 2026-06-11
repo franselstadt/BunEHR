@@ -19,7 +19,7 @@ export interface ContributionVersionRequest {
   readonly uid?: ObjectVersionId
   readonly precedingVersionUid?: ObjectVersionId
 }
-export interface ContributionRepository {
+export interface IContributionRepository {
   create(ehrId: string, versions: ReadonlyArray<ContributionVersionRequest>, audit: ContributionAuditRequest): Promise<ContributionAggregate>
   findByUid(ehrId: string, uid: string): Promise<ContributionAggregate>
 }

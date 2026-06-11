@@ -24,7 +24,7 @@ export interface EhrStatusVersionedResponse {
 }
 
 // ── Repository port ───────────────────────────────────────────────────────────
-export interface EhrRepository {
+export interface IEhrRepository {
   create(ehrId: string, subjectId: string, subjectNamespace: string, isQueryable: boolean, isModifiable: boolean): Promise<EhrAggregate>
   findById(ehrId: string): Promise<EhrAggregate>
   findBySubject(subjectId: string, namespace: string): Promise<EhrAggregate>

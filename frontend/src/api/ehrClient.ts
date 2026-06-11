@@ -50,6 +50,10 @@ export const runAql = (q: string, fetch = 50, offset = 0) =>
 export const getPatients = () =>
   request<Patient[]>('GET', '/api/patients')
 
+/** Create a new patient (openEHR EHR + demographics) */
+export const createPatient = (data: Pick<Patient, 'firstName' | 'lastName'> & Partial<Patient>) =>
+  request<Patient>('POST', '/api/patients', data)
+
 /** Get a single patient by EHR ID */
 export const getPatient = (ehrId: string) =>
   request<Patient>('GET', `/api/patients/${ehrId}`)

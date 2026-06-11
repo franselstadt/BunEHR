@@ -1,7 +1,7 @@
 import { eq, and, desc } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { ehr, ehrStatus } from '../schema.ts'
-import type { EhrRepository, EhrAggregate, EhrStatusVo, EhrStatusVersionedResponse } from '../../../domain/ehr/EhrAggregate.ts'
+import type { IEhrRepository, EhrAggregate, EhrStatusVo, EhrStatusVersionedResponse } from '../../../domain/ehr/EhrAggregate.ts'
 import type { PartySelf } from '../../../domain/shared/OpenEhrTypes.ts'
 import { newUuid } from '../../../domain/shared/IdGenerator.ts'
 import {
@@ -12,7 +12,7 @@ import {
   EhrNotFoundError, EhrAlreadyExistsError, PreconditionFailedError,
 } from '../../../domain/shared/DomainErrors.ts'
 
-export class DrizzleEhrRepository implements EhrRepository {
+export class EhrRepository implements IEhrRepository {
   constructor(private readonly db: Db) {}
 
   async create(ehrId: string, subjectId: string, subjectNamespace: string, isQueryable: boolean, isModifiable: boolean): Promise<EhrAggregate> {

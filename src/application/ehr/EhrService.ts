@@ -1,9 +1,10 @@
-import type { EhrRepository, EhrAggregate, EhrStatusVo, EhrStatusVersionedResponse } from '../../domain/ehr/EhrAggregate.ts'
+import type { IEhrRepository, EhrAggregate, EhrStatusVo, EhrStatusVersionedResponse } from '../../domain/ehr/EhrAggregate.ts'
 import type { PartySelf } from '../../domain/shared/OpenEhrTypes.ts'
+import type { IEhrService } from '../contracts/IEhrService.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
 
-export class EhrApplicationService {
-  constructor(private readonly repo: EhrRepository) {}
+export class EhrService implements IEhrService {
+  constructor(private readonly repo: IEhrRepository) {}
 
   async createEhr(requestedEhrId?: string, subject?: PartySelf, isQueryable = true, isModifiable = true): Promise<EhrAggregate> {
     const ehrId          = requestedEhrId ?? newUuid()

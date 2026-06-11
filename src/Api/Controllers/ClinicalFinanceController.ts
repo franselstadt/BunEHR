@@ -25,10 +25,10 @@ import {
 import {
   ICD10_CODES, PROCEDURE_CODES, ICD10_PROCEDURE_MAPS,
   SAMPLE_FINANCIAL_RECORDS, SAMPLE_MEDICARE,
-} from '../../clinicalData.ts'
+} from '../../infrastructure/seed/ClinicalSeedData.ts'
 import { newUuid } from '../../domain/shared/IdGenerator.ts'
 
-export function createClinicalRoutes() {
+export function createClinicalFinanceController() {
   const app = new Hono()
 
   // ── ICD-10 ───────────────────────────────────────────────────────────────

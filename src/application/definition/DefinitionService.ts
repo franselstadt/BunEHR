@@ -1,7 +1,7 @@
-import type { DefinitionRepository, Template, TemplateInfo } from '../../domain/query/QueryModels.ts'
+import type { IDefinitionRepository, Template, TemplateInfo } from '../../domain/query/QueryModels.ts'
 
-export class DefinitionApplicationService {
-  constructor(private readonly repo: DefinitionRepository) {}
+export class DefinitionService {
+  constructor(private readonly repo: IDefinitionRepository) {}
   async uploadTemplate(adlVersion: string, content: string): Promise<Template>                                    { return this.repo.uploadTemplate(adlVersion, content) }
   async listTemplates(adlVersion: string): Promise<ReadonlyArray<TemplateInfo>>                                    { return this.repo.listTemplates(adlVersion) }
   async getTemplate(adlVersion: string, templateId: string): Promise<Template>                                    { return this.repo.getTemplate(adlVersion, templateId) }

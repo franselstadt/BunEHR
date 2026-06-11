@@ -39,7 +39,7 @@ export interface CompositionVersionedResponse {
   readonly revisionHistory: RevisionHistory
 }
 
-export interface CompositionRepository {
+export interface ICompositionRepository {
   create(ehrId: string, data: Omit<CompositionAggregate, 'uid'>): Promise<CompositionAggregate>
   findByVersionUid(ehrId: string, versionedObjectUid: string, versionAtTime?: string): Promise<CompositionAggregate>
   update(ehrId: string, versionedObjectUid: string, ifMatch: string, data: Omit<CompositionAggregate, 'uid'>): Promise<CompositionAggregate>

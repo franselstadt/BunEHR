@@ -10,6 +10,7 @@
 | Resource | Location |
 |---|---|
 | **Full architecture reference (Markdown)** | [architecture.md](./architecture.md) |
+| **Layer guide (onboarding)** | [layer-guide.md](./layer-guide.md) |
 | **HTML version (print / browser)** | [architecture.html](./architecture.html) |
 | **API (Swagger UI)** | http://localhost:3000/docs |
 | **OpenAPI JSON** | http://localhost:3000/api-docs |

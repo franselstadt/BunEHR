@@ -1,12 +1,12 @@
 import { eq } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { ehr, directory } from '../schema.ts'
-import type { DirectoryRepository, DirectoryAggregate, ObjectRef, FolderVo } from '../../../domain/directory/DirectoryAggregate.ts'
+import type { IDirectoryRepository, DirectoryAggregate, ObjectRef, FolderVo } from '../../../domain/directory/DirectoryAggregate.ts'
 import { newUuid } from '../../../domain/shared/IdGenerator.ts'
 import { buildVersionId, incrementVersionId, ObjectVersionId, HierObjectId, DvText } from '../../../domain/shared/OpenEhrTypes.ts'
 import { EhrNotFoundError, DirectoryNotFoundError, DirectoryAlreadyExistsError, PreconditionFailedError } from '../../../domain/shared/DomainErrors.ts'
 
-export class DrizzleDirectoryRepository implements DirectoryRepository {
+export class DirectoryRepository implements IDirectoryRepository {
   constructor(private readonly db: Db) {}
 
   async create(ehrId: string, data: Omit<DirectoryAggregate, 'uid'>): Promise<DirectoryAggregate> {

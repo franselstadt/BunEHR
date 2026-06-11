@@ -183,20 +183,28 @@ const rows = await db
 
 ## Architecture
 
-BunEHR follows **Domain-Driven Design (DDD)** with strict 4-layer separation:
+BunEHR follows **Clean Architecture**:
 
 ```
 src/
-├── domain/              ← Clinical rules — pure TypeScript, zero deps
-├── application/         ← Use cases — thin orchestrators, one method per story
-├── infrastructure/      ← Drizzle ORM + PostgreSQL adapters
-│   ├── database/
-│   │   ├── schema.ts    ← Single source of truth: DB structure + TypeScript types
-│   │   ├── client.ts    ← postgres.js connection pool
-│   │   └── repositories/← Implements domain ports (DrizzleEhrRepository, etc.)
-│   └── config/container.ts  ← Manual DI — wires everything together
-└── interfaces/          ← Hono routes, Zod validation, WebSocket, middleware
+├── Api/                         ← Presentation (Controllers, DTOs, Program.ts)
+│   ├── Controllers/             ← OpenEhrController, PatientsController, …
+│   ├── Middleware/              ← ExceptionMiddleware, JsonNamingMiddleware
+│   ├── Dtos/                    ← Request DTOs (Zod validation)
+│   └── Program.ts               ← HTTP pipeline
+├── application/                 ← Use cases
+│   ├── contracts/               ← I*Service interfaces
+│   ├── ehr/EhrService.ts
+│   ├── patient/PatientService.ts
+│   └── …
+├── domain/                      ← Entities + I*Repository ports
+├── infrastructure/              ← Drizzle repos + DependencyInjection.ts
+│   ├── config/DependencyInjection.ts
+│   └── seed/                    ← Demo data
+└── index.ts                     ← Host entry point
 ```
+
+**New to the codebase?** Start with [docs/layer-guide.md](docs/layer-guide.md) for folder layout, naming, and request flow.
 
 ---
 

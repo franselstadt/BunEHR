@@ -17,13 +17,13 @@ export interface StoredQuery {
 export interface TemplateInfo { readonly templateId: string; readonly version?: string; readonly concept?: string; readonly createdTimestamp: string }
 export interface Template extends TemplateInfo { readonly content: string }
 
-export interface QueryRepository {
+export interface IQueryRepository {
   executeAql(q: string, offset?: number, fetch?: number, params?: Record<string, unknown>): Promise<AqlQueryResult>
   saveStoredQuery(qualifiedName: string, version: string, q: string, type: string): Promise<StoredQuery>
   listStoredQueries(prefix?: string): Promise<ReadonlyArray<StoredQuery>>
   getStoredQuery(qualifiedName: string): Promise<StoredQuery>
 }
-export interface DefinitionRepository {
+export interface IDefinitionRepository {
   uploadTemplate(adlVersion: string, content: string, templateId?: string): Promise<Template>
   listTemplates(adlVersion: string): Promise<ReadonlyArray<TemplateInfo>>
   getTemplate(adlVersion: string, templateId: string): Promise<Template>

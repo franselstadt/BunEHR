@@ -1,7 +1,7 @@
 import { eq, and, desc, lte } from 'drizzle-orm'
 import type { Db } from '../client.ts'
 import { ehr, composition } from '../schema.ts'
-import type { CompositionRepository, CompositionAggregate, CompositionVersionedResponse } from '../../../domain/composition/CompositionAggregate.ts'
+import type { ICompositionRepository, CompositionAggregate, CompositionVersionedResponse } from '../../../domain/composition/CompositionAggregate.ts'
 import { newUuid } from '../../../domain/shared/IdGenerator.ts'
 import {
   buildVersionId, incrementVersionId,
@@ -9,7 +9,7 @@ import {
 } from '../../../domain/shared/OpenEhrTypes.ts'
 import { EhrNotFoundError, CompositionNotFoundError, PreconditionFailedError } from '../../../domain/shared/DomainErrors.ts'
 
-export class DrizzleCompositionRepository implements CompositionRepository {
+export class CompositionRepository implements ICompositionRepository {
   constructor(private readonly db: Db) {}
 
   async create(ehrId: string, data: Omit<CompositionAggregate, 'uid'>): Promise<CompositionAggregate> {

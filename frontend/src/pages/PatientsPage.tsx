@@ -10,24 +10,27 @@
  *  - Status badges colour-coded by acuity
  *  - Click-through to detailed patient view
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box, Typography, TextField, InputAdornment, Select, MenuItem,
   FormControl, InputLabel, Grid, Card, CardContent, CardActionArea,
   Avatar, Chip, Stack, Button, Tooltip, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, LinearProgress,
 } from '@mui/material'
 import {
   Search as SearchIcon, PersonAdd as AddIcon,
   FilterList as FilterIcon,
 } from '@mui/icons-material'
-import { SAMPLE_PATIENTS } from '../api/samplePatients.ts'
 import { statusColors, wardColors } from '../theme/medblocksTheme.ts'
 import { PageGuide } from '../components/shared/PageGuide.tsx'
+import { createPatient, getPatients } from '../api/ehrClient.ts'
 import type { Patient } from '../types/openehr.ts'
 
-const WARDS     = ['All wards', ...new Set(SAMPLE_PATIENTS.map(p => p.ward))]
-const STATUSES  = ['All statuses', 'CRITICAL', 'ADMITTED', 'OBSERVATION', 'STABLE', 'ACTIVE', 'DISCHARGED']
+const DEFAULT_WARDS = ['General Medicine', 'Emergency', 'Cardiology', 'ICU', 'Orthopedics', 'Neurology', 'Oncology', 'Pediatrics']
+const STATUSES  = ['All statuses', 'CRITICAL', 'ADMITTED', 'OBSERVATION', 'STABLE', 'ACTIVE', 'DISCHARGED'] as const
+const GENDERS   = ['male', 'female', 'other'] as const
+const BLOOD_TYPES = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 /** Age from ISO date string */
 const age = (dob: string) => Math.floor((Date.now() - new Date(dob).getTime()) / 3.156e10)
@@ -108,19 +111,90 @@ function VitalPill({ label, value, unit, alert }: { label: string; value: number
 
 export default function PatientsPage() {
   const navigate = useNavigate()
-  const [search,  setSearch]  = useState('')
-  const [ward,    setWard]    = useState('All wards')
-  const [status,  setStatus]  = useState('All statuses')
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [ward,     setWard]     = useState('All wards')
+  const [status,   setStatus]   = useState('All statuses')
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '1980-01-01',
+    gender: 'other' as Patient['gender'],
+    bloodType: 'O+',
+    ward: 'General Medicine',
+    room: '',
+    primaryDiagnosis: '',
+    primaryClinician: 'Dr. Admin',
+    status: 'ADMITTED' as Patient['status'],
+  })
+
+  const loadPatients = useCallback(async () => {
+    setLoading(true)
+    try {
+      setPatients(await getPatients())
+    } catch {
+      const { SAMPLE_PATIENTS } = await import('../api/samplePatients.ts')
+      setPatients(SAMPLE_PATIENTS)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadPatients() }, [loadPatients])
+
+  const wards = useMemo(
+    () => ['All wards', ...new Set([...DEFAULT_WARDS, ...patients.map(p => p.ward)])],
+    [patients],
+  )
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return SAMPLE_PATIENTS.filter(p => {
+    return patients.filter(p => {
       const matchQ = !q || `${p.firstName} ${p.lastName} ${p.primaryDiagnosis} ${p.ehrId}`.toLowerCase().includes(q)
       const matchW = ward   === 'All wards'    || p.ward   === ward
       const matchS = status === 'All statuses' || p.status === status
       return matchQ && matchW && matchS
     })
-  }, [search, ward, status])
+  }, [patients, search, ward, status])
+
+  const handleCreate = async () => {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setCreateError('First and last name are required.')
+      return
+    }
+    setCreating(true)
+    setCreateError('')
+    try {
+      const patient = await createPatient({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        dateOfBirth: form.dateOfBirth,
+        gender: form.gender,
+        bloodType: form.bloodType,
+        ward: form.ward,
+        room: form.room.trim() || `${form.ward.slice(0, 2).toUpperCase()}-100`,
+        primaryDiagnosis: form.primaryDiagnosis.trim() || 'Pending assessment',
+        primaryClinician: form.primaryClinician.trim() || 'Dr. Admin',
+        status: form.status,
+      })
+      setDialogOpen(false)
+      setForm({
+        firstName: '', lastName: '', dateOfBirth: '1980-01-01', gender: 'other',
+        bloodType: 'O+', ward: 'General Medicine', room: '', primaryDiagnosis: '',
+        primaryClinician: 'Dr. Admin', status: 'ADMITTED',
+      })
+      await loadPatients()
+      navigate(`/patients/${patient.ehrId}`)
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Failed to create patient')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <Box>
@@ -134,7 +208,8 @@ export default function PatientsPage() {
             EHRs below.
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} sx={{ whiteSpace: 'nowrap', ml: 2 }}>
+        <Button variant="contained" startIcon={<AddIcon />} sx={{ whiteSpace: 'nowrap', ml: 2 }}
+          onClick={() => { setCreateError(''); setDialogOpen(true) }}>
           New Patient
         </Button>
       </Box>
@@ -159,7 +234,7 @@ export default function PatientsPage() {
           <FormControl fullWidth size="small">
             <InputLabel>Ward</InputLabel>
             <Select value={ward} label="Ward" onChange={e => setWard(e.target.value)}>
-              {WARDS.map(w => <MenuItem key={w} value={w}>{w}</MenuItem>)}
+              {wards.map(w => <MenuItem key={w} value={w}>{w}</MenuItem>)}
             </Select>
           </FormControl>
         </Grid>
@@ -177,9 +252,11 @@ export default function PatientsPage() {
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
         <Typography variant="caption" color="text.secondary">
-          {filtered.length} of {SAMPLE_PATIENTS.length} patients
+          {filtered.length} of {patients.length} patients
         </Typography>
       </Box>
+
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
 
       {/* Patient cards grid */}
       <Grid container spacing={2}>
@@ -198,6 +275,81 @@ export default function PatientsPage() {
         )}
       </Grid>
 
+      <Dialog open={dialogOpen} onClose={() => !creating && setDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>New Patient — Create openEHR Record</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Creates a new <strong>EHR</strong> in PostgreSQL and registers the patient for the hospital dashboard.
+          </Typography>
+          {createError && <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert>}
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={6}>
+              <TextField label="First name" required fullWidth size="small"
+                value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField label="Last name" required fullWidth size="small"
+                value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField label="Date of birth" type="date" fullWidth size="small" InputLabelProps={{ shrink: true }}
+                value={form.dateOfBirth} onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Gender</InputLabel>
+                <Select label="Gender" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value as Patient['gender'] }))}>
+                  {GENDERS.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Blood type</InputLabel>
+                <Select label="Blood type" value={form.bloodType} onChange={e => setForm(f => ({ ...f, bloodType: e.target.value }))}>
+                  {BLOOD_TYPES.map(b => <MenuItem key={b} value={b}>{b}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Ward</InputLabel>
+                <Select label="Ward" value={form.ward} onChange={e => setForm(f => ({ ...f, ward: e.target.value }))}>
+                  {DEFAULT_WARDS.map(w => <MenuItem key={w} value={w}>{w}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField label="Room" fullWidth size="small" placeholder="e.g. GM-101"
+                value={form.room} onChange={e => setForm(f => ({ ...f, room: e.target.value }))} />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Status</InputLabel>
+                <Select label="Status" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Patient['status'] }))}>
+                  {STATUSES.filter(s => s !== 'All statuses').map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField label="Primary diagnosis" fullWidth size="small" placeholder="e.g. Hypertension (I10)"
+                value={form.primaryDiagnosis} onChange={e => setForm(f => ({ ...f, primaryDiagnosis: e.target.value }))} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField label="Primary clinician" fullWidth size="small"
+                value={form.primaryClinician} onChange={e => setForm(f => ({ ...f, primaryClinician: e.target.value }))} />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDialogOpen(false)} disabled={creating}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreate} disabled={creating}
+            startIcon={creating ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}>
+            {creating ? 'Creating…' : 'Create EHR'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <PageGuide
         title="Patient Records"
         tagline="Browse and search all patient EHRs in the system"
@@ -206,6 +358,7 @@ export default function PatientsPage() {
         openEhrExplanation="An EHR (Electronic Health Record) is the root object in openEHR — a permanent, globally unique record identified by an ehrId (UUID). Once created, an EHR is never deleted or transferred. All clinical data for the patient hangs off their EHR. The subject reference (subject_id + subject_namespace) links the openEHR EHR to the patient in your demographics system."
         endpoints={[
           { method: 'GET', path: '/api/patients', description: 'List all patients with demographics and current vitals' },
+          { method: 'POST', path: '/api/patients', description: 'Create a new patient EHR from the New Patient dialog' },
           { method: 'POST', path: '/v1/ehr', description: 'Create a new EHR for a patient', example: 'curl -X POST http://localhost:3000/v1/ehr \\\n  -H "Content-Type: application/json" \\\n  -H "Prefer: return=representation" \\\n  -d \'{"ehr_status":{"subject":{"external_ref":{"id":{"value":"patient-001"},"namespace":"local","type":"PERSON"}}}}\''},
           { method: 'GET', path: '/v1/ehr/{ehr_id}', description: 'Get a specific EHR by ID' },
           { method: 'GET', path: '/v1/ehr?subject_id=X', description: 'Find an EHR by patient subject ID' },
