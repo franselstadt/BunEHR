@@ -13,6 +13,7 @@
 [![Drizzle](https://img.shields.io/badge/ORM-Drizzle-C5F74F?style=flat-square&labelColor=222)](https://orm.drizzle.team)
 [![React](https://img.shields.io/badge/Frontend-React%2018%20%2B%20MUI%20v6-61DAFB?style=flat-square&labelColor=222)](https://mui.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-franselstadt%2FBunEHR-181717?style=flat-square&logo=github)](https://github.com/franselstadt/BunEHR)
 
 </div>
 
@@ -50,8 +51,8 @@ Data stored in BunEHR is interoperable with any other openEHR v1-compliant syste
 ### 1. Start the stack
 
 ```bash
-git clone https://github.com/your-org/bunehr.git
-cd bunehr/BunEHR
+git clone https://github.com/franselstadt/BunEHR.git
+cd BunEHR
 cp .env .env.local     # adjust credentials if needed
 docker compose up -d
 ```
@@ -311,4 +312,4 @@ Apache 2.0 — see [LICENSE](LICENSE)
 
 ---
 
-*Demo by Frans Elstadt · BunEHR v1.0.0 · openEHR REST API v1*
+*Demo by Frans Elstadt · [BunEHR v1.0.0](https://github.com/franselstadt/BunEHR) · openEHR REST API v1*

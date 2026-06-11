@@ -2,6 +2,11 @@
   "name": "bun-ehr",
   "version": "1.0.0",
   "description": "Full OpenEHR REST API v1 — TypeScript/Bun + Drizzle ORM + PostgreSQL",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/franselstadt/BunEHR.git"
+  },
+  "homepage": "https://github.com/franselstadt/BunEHR",
   "module": "src/index.ts",
   "type": "module",
   "scripts": {
